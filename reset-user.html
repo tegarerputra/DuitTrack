@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reset User to New User Status</title>
+</head>
+<body>
+    <h2>Reset User Data</h2>
+    <p>This will reset tegarerputra@gmail.com to be treated as a new user</p>
+    <button id="resetBtn">Reset User to New Status</button>
+    <div id="result"></div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    
+    <!-- Firebase Config -->
+    <script src="config/firebase-config.js"></script>
+    
+    <script>
+        document.getElementById('resetBtn').addEventListener('click', async () => {
+            try {
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = 'Processing...';
+                
+                // Sign in first to get the user
+                await auth.signInWithPopup(googleProvider);
+                const user = auth.currentUser;
+                
+                if (user && user.email === 'tegarerputra@gmail.com') {
+                    console.log('Resetting user:', user.email);
+                    
+                    // Delete user profile document (this will make them appear as new user)
+                    const userProfileRef = db.collection('users').doc(user.uid);
+                    await userProfileRef.delete();
+                    
+                    // Delete all budgets data
+                    const budgetsRef = db.collection('users').doc(user.uid).collection('budgets');
+                    const budgetDocs = await budgetsRef.get();
+                    const batch = db.batch();
+                    budgetDocs.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    await batch.commit();
+                    
+                    // Delete all expenses data
+                    const expensesRef = db.collection('users').doc(user.uid).collection('expenses');
+                    const expenseDocs = await expensesRef.get();
+                    const batch2 = db.batch();
+                    expenseDocs.forEach(doc => {
+                        batch2.delete(doc.ref);
+                    });
+                    await batch2.commit();
+                    
+                    resultDiv.innerHTML = `
+                        <div style="color: green; font-weight: bold;">
+                            ✅ SUCCESS! User ${user.email} has been reset to new user status.
+                        </div>
+                        <p><strong>Next steps for debugging:</strong></p>
+                        <ol>
+                            <li><button onclick="auth.signOut().then(() => console.log('Logged out'))">Click here to logout</button></li>
+                            <li><a href="http://127.0.0.1:8000" target="_blank">Go to main app</a></li>
+                            <li>Open browser console (F12) to see debug logs</li>
+                            <li>Login and check what happens</li>
+                        </ol>
+                        <p style="color: orange;">⚠️ Check browser console for detailed debugging info</p>
+                    `;
+                    
+                } else if (user) {
+                    resultDiv.innerHTML = `<div style="color: red;">Error: You're logged in as ${user.email}, but we need tegarerputra@gmail.com</div>`;
+                } else {
+                    resultDiv.innerHTML = '<div style="color: red;">Error: Please login first</div>';
+                }
+                
+            } catch (error) {
+                console.error('Error resetting user:', error);
+                document.getElementById('result').innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>

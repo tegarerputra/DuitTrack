@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DuitTrack - Expense Tracker</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#0D1117">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- Preload Critical CSS -->
+    <link rel="preload" href="assets/css/main.css?v=final" as="style">
+    <link rel="preload" href="assets/css/components.css?v=important-force-fix" as="style">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="assets/css/main.css?v=final">
+    <link rel="stylesheet" href="assets/css/components.css?v=important-force-fix">
+    <link rel="stylesheet" href="assets/css/glassmorphism.css?v=final">
+    <link rel="stylesheet" href="assets/css/money-moves.css?v=1.0">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-spinner neon-glow"></div>
+        <p>Loading DuitTrack...</p>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar glass-nav">
+        <div class="nav-container">
+            <button id="menuToggle" class="menu-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <h1 class="nav-title">DuitTrack</h1>
+            <div class="nav-user">
+                <img id="userAvatar" class="user-avatar" src="assets/images/default-avatar.svg" alt="User">
+                <div id="userLoginDropdown" class="user-login-dropdown">
+                    <button id="dropdownGoogleLogin" class="dropdown-google-login">
+                        <img src="assets/images/google-icon.svg" alt="Google" class="google-icon">
+                        Sign in with Google
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dropdown Menu -->
+    <div id="menuDropdown" class="menu-dropdown">
+        <div class="dropdown-items glass-card">
+            <div class="menu-main">
+                <ul class="menu-list">
+                    <li><a href="#dashboard" data-page="dashboard">📊 Dashboard</a></li>
+                    <li><a href="#expenses" data-page="expenses">💫 Money Moves</a></li>
+                    <li><a href="#reports" data-page="reports">📈 Laporan & Chart</a></li>
+                    <li><a href="#budget" data-page="budget">💰 Kelola Budget</a></li>
+                    <li><a href="#export" data-page="export">📤 Export Data</a></li>
+                </ul>
+            </div>
+            <div class="menu-bottom">
+                <ul class="menu-list">
+                    <li><a href="#logout" data-action="logout">🚪 Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <main id="app" class="app-container">
+        <!-- Landing/Login Page -->
+        <section id="landingPage" class="page active">
+            <div class="landing-container">
+                <div class="hero-section glass-card">
+                    <div class="hero-content">
+                        <h1 class="hero-title">DuitTrack</h1>
+                        <p class="hero-subtitle">💰 Your Money's New Best Friend 💰</p>
+                        <p class="hero-description">Track expenses like a pro, budget like a boss, and watch your wallet thank you!</p>
+                    </div>
+                    
+                    <div class="login-section">
+                        <button id="googleLogin" class="google-login-btn glass-btn">
+                            <img src="assets/images/google-icon.svg" alt="Google" class="google-icon">
+                            Get Started with Google
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="features-preview">
+                    <div class="features-card glass-card">
+                        <h3>✨ What Makes DuitTrack Awesome</h3>
+                        <div class="features-list">
+                            <div class="feature-item">
+                                <span class="feature-icon">⚡</span>
+                                <div class="feature-content">
+                                    <strong>Lightning Fast Entry</strong>
+                                    <p>Add expenses faster than you can say "where did my money go?"</p>
+                                </div>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">📊</span>
+                                <div class="feature-content">
+                                    <strong>Pretty Charts & Graphs</strong>
+                                    <p>Turn your spending into eye candy with beautiful visualizations</p>
+                                </div>
+                            </div>
+                            <div class="feature-item">
+                                <span class="feature-icon">📱</span>
+                                <div class="feature-content">
+                                    <strong>Mobile-First Magic</strong>
+                                    <p>Perfectly crafted for your pocket-sized financial command center</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Budget Onboarding Page -->
+        <section id="budgetOnboardingPage" class="page">
+            <div class="onboarding-container">
+                <div class="onboarding-header glass-card">
+                    <button class="welcome-close-btn" id="welcomeCloseBtn">&times;</button>
+                    <div class="onboarding-icon">🎯</div>
+                    <h1>Welcome to DuitTrack!</h1>
+                    <p class="onboarding-subtitle">Let's set up your monthly budget to get started</p>
+                    <p class="onboarding-description">Don't worry, you can always adjust these later</p>
+                </div>
+
+                <div class="budget-setup-card glass-card">
+                    <form id="budgetOnboardingForm" class="budget-form">
+                        <div class="form-section">
+                            <div class="section-header">
+                                <div class="section-icon">📊</div>
+                                <div class="section-info">
+                                    <h3>Category Budgets</h3>
+                                    <p class="budget-period-info" id="budgetPeriodInfo">Budget Period: September 2025</p>
+                                    <p class="section-description">Set your spending limits for each category</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Quick Suggestions (Always visible at top) -->
+                            <div class="category-suggestions" id="categorySuggestions">
+                                <p class="suggestions-label">Quick suggestions:</p>
+                                <div class="suggestion-buttons" id="suggestionButtons">
+                                    <!-- Buttons will be generated by JS -->
+                                </div>
+                            </div>
+
+                            <div class="category-budgets" id="categoryBudgetsList">
+                                <!-- Dynamic categories will be added here -->
+                                
+                                <!-- Add Category Button - Moved to bottom for better UX -->
+                                <div class="add-category-button" id="addCategoryButton">
+                                    <button type="button" class="btn-add-category">
+                                        <span class="add-icon">➕</span>
+                                        <span>Add Category</span>
+                                    </button>
+                                </div>
+
+                                <!-- Add Category Form - Now at bottom -->
+                                <div class="add-category-form" id="addCategoryForm" style="display: none;">
+                                    <div class="category-budget-item">
+                                        <div class="category-info">
+                                            <div class="auto-emoji-display" id="autoEmojiDisplay">💰</div>
+                                            <div class="category-details">
+                                                <input type="text" id="newCategoryName" class="glass-input category-name-input" 
+                                                       placeholder="Category name">
+                                                <input type="text" id="newCategoryDescription" class="glass-input category-desc-input" 
+                                                       placeholder="Optional description">
+                                            </div>
+                                        </div>
+                                        <div class="budget-input-group">
+                                            <input type="text" id="newCategoryBudget" class="glass-input category-budget-input" 
+                                                   placeholder="100.000" min="0">
+                                            <span class="currency">Rp</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-actions-inline">
+                                        <button type="button" class="btn-secondary btn-small" id="cancelAddCategory">Cancel</button>
+                                        <button type="button" class="btn-primary btn-small" id="saveAddCategory">Add Category</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="budget-summary">
+                                <div class="budget-total">
+                                    <div class="budget-label">Your Monthly Budget</div>
+                                    <div id="totalAllocated" class="total-amount">Rp 0</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="onboarding-actions">
+                            <button type="button" class="btn-secondary" id="skipBudgetBtn">
+                                Skip for Now
+                            </button>
+                            <button type="submit" class="btn-primary">
+                                Complete Setup
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Page -->
+        <section id="dashboardPage" class="page">
+            <div class="dashboard-container">
+                <div class="dashboard-header">
+                    <h2>Dashboard</h2>
+                    <select id="monthSelector" class="month-selector glass-input">
+                        <option value="2025-09">September 2025</option>
+                        <option value="2025-08">Agustus 2025</option>
+                    </select>
+                </div>
+
+                <!-- Priority Section: Essential Actions -->
+                <div class="priority-section">
+                    <!-- Add Expense Card (Prominent) -->
+                    <div class="add-expense-card glass-card neon-border" id="addExpenseCard">
+                        <h3>➕ Add New Expense</h3>
+                        <p>Tap here for lightning-fast entry!</p>
+                    </div>
+                </div>
+
+                <!-- Main Dashboard Grid -->
+                <div class="dashboard-main-grid">
+                    <!-- Consolidated Budget Status Card -->
+                    <div class="budget-status-card glass-card primary-card" id="budgetStatusMain">
+                    <div class="budget-header">
+                        <h3>Budget Status</h3>
+                        <span class="budget-health-indicator" id="budgetHealthIndicator">🟢</span>
+                    </div>
+                    
+                    <div class="budget-main-metrics">
+                        <div class="budget-progress-visual">
+                            <div class="budget-bar-progress" id="barProgress">
+                                <div class="budget-main-info">
+                                    <div class="spent-amount" id="totalSpent">Rp 0</div>
+                                    <div class="total-budget" id="totalBudgetLabel">/ Rp 0</div>
+                                </div>
+                                
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar-bg">
+                                        <div class="progress-zones">
+                                            <div class="zone-safe" style="width: 70%"></div>
+                                            <div class="zone-warning" style="width: 20%"></div>
+                                            <div class="zone-danger" style="width: 10%"></div>
+                                        </div>
+                                        <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="budget-bottom-info">
+                                    <div class="percentage-text" id="budgetPercentage">0%</div>
+                                    <div class="budget-status-text" id="budgetStatusText">Masih aman</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="budget-quick-stats">
+                            <div class="stat-mini">
+                                <span class="stat-icon">📊</span>
+                                <div class="stat-info">
+                                    <span class="stat-label">Rata-rata/minggu</span>
+                                    <span class="stat-value" id="dailyAverageAmount">Rp 0</span>
+                                </div>
+                            </div>
+                            <div class="stat-mini">
+                                <span class="stat-icon">🎯</span>
+                                <div class="stat-info">
+                                    <span class="stat-label">Proyeksi bulan</span>
+                                    <span class="stat-value" id="monthlyProjectionAmount">Rp 0</span>
+                                </div>
+                            </div>
+                            <div class="stat-mini">
+                                <span class="stat-icon">📅</span>
+                                <div class="stat-info">
+                                    <span class="stat-label">Hari tersisa</span>
+                                    <span class="stat-value" id="daysLeftCount">0 hari</span>
+                                </div>
+                            </div>
+                            <div class="stat-mini">
+                                <span class="stat-icon">💰</span>
+                                <div class="stat-info">
+                                    <span class="stat-label">Sisa budget</span>
+                                    <span class="stat-value" id="totalRemaining">Rp 0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                    
+                    <!-- Financial Intelligence Panel -->
+                    <div class="financial-intelligence glass-card secondary-card" id="intelligencePanel">
+                        <div class="intelligence-header">
+                            <h3>🧠 Financial Intelligence</h3>
+                            <div class="intelligence-tabs">
+                                <button class="tab-btn active" data-tab="insights" id="insightsTab">Insights</button>
+                                <button class="tab-btn" data-tab="metrics" id="metricsTab">Metrics</button>
+                            </div>
+                        </div>
+                        
+                        <div class="intelligence-content">
+                            <div class="tab-content active" id="insights-content">
+                                <div id="insightsList" class="insights-list">
+                                    <!-- Smart insights will be loaded here -->
+                                </div>
+                            </div>
+                            
+                            <div class="tab-content" id="metrics-content">
+                                <div class="metrics-compact-grid">
+                                    <div class="metric-item">
+                                        <div class="metric-icon">⚡</div>
+                                        <div class="metric-info">
+                                            <span class="metric-label">Budget Efficiency</span>
+                                            <span class="metric-value" id="budgetEfficiency">0%</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <div class="metric-icon">💎</div>
+                                        <div class="metric-info">
+                                            <span class="metric-label">Savings Potential</span>
+                                            <span class="metric-value" id="savingsPotential">Rp 0</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <div class="metric-icon">📈</div>
+                                        <div class="metric-info">
+                                            <span class="metric-label">Spending Trend</span>
+                                            <span class="metric-value" id="spendingTrend">Stable</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <div class="metric-icon">🎯</div>
+                                        <div class="metric-info">
+                                            <span class="metric-label">Goal Progress</span>
+                                            <span class="metric-value" id="goalProgress">0%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Secondary Content -->
+                <div class="secondary-content">
+                    <!-- Category Breakdown -->
+                    <div class="category-breakdown glass-card tertiary-card">
+                        <h3>Category Breakdown</h3>
+                        <div id="categoryAccordion" class="category-accordion">
+                            <!-- Accordion will be rendered here -->
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Money Moves Page -->
+        <section id="expensesPage" class="page">
+            <div class="money-moves-container">
+                <div class="money-moves-header">
+                    <h2>💫 Money Moves</h2>
+                    <div class="header-subtitle">Your complete spending journey</div>
+                </div>
+
+                <!-- Month Filter -->
+                <div class="month-filter-section">
+                    <select id="expenseMonthSelector" class="month-selector glass-input">
+                        <option value="2025-09">September 2025</option>
+                        <option value="2025-08">Agustus 2025</option>
+                    </select>
+                </div>
+
+                <!-- Expenses List Container -->
+                <div class="expenses-timeline" id="expensesTimeline">
+                    <!-- Expenses will be loaded here with infinite scroll -->
+                </div>
+
+                <!-- Loading State -->
+                <div id="expensesLoading" class="loading-expenses" style="display: none;">
+                    <div class="loading-spinner neon-glow"></div>
+                    <p>Loading your money moves...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="expensesEmpty" class="empty-expenses-state" style="display: none;">
+                    <div class="empty-state-animation">
+                        <div class="empty-icon">💸</div>
+                        <div class="empty-sparkles">✨</div>
+                    </div>
+                    <h3>No Money Moves Yet!</h3>
+                    <p>Your spending story starts here. Add your first expense to see the magic happen!</p>
+                    <button class="btn-primary add-first-expense" id="addFirstExpense">
+                        ➕ Add Your First Move
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Other pages will be added here -->
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <span class="footer-logo">💰 DuitTrack</span>
+                <span class="footer-year">2025</span>
+            </div>
+            <div class="footer-tagline">
+                <p>Smart money, smarter you</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Add Expense Modal -->
+    <div id="addExpenseModal" class="modal">
+        <div class="modal-container glass-card">
+            <div class="modal-header">
+                <h3>Add Expense</h3>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            
+            <!-- Form Content (Default State) -->
+            <div class="modal-content" id="modalFormContent">
+                <form id="expenseForm" class="expense-form" novalidate>
+                <div class="form-group">
+                    <label for="expenseAmount">Amount</label>
+                    <div class="currency-input-group">
+                        <input type="text" id="expenseAmount" class="glass-input currency-input" 
+                               placeholder="1.000.000" inputmode="numeric">
+                        <span class="currency-prefix">Rp</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="expenseCategory">Category</label>
+                    <select id="expenseCategory" class="glass-input expense-category-dropdown">
+                        <option value="OTHER">Choose category (optional)</option>
+                        <!-- Categories will be loaded dynamically -->
+                    </select>
+                </div>
+                
+                <!-- Smart Warning Container (will be populated by JS) -->
+                <div id="smartWarningContainer" class="smart-warning-container" style="display: none;">
+                    <!-- Smart warnings will appear here -->
+                </div>
+                
+                <div class="form-group">
+                    <label for="expenseDescription">Description</label>
+                    <input type="text" id="expenseDescription" class="glass-input" placeholder="What did you spend on?">
+                </div>
+                
+                <div class="form-group">
+                    <label for="expenseDate">Date</label>
+                    <input type="date" id="expenseDate" class="glass-input">
+                </div>
+                
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+                        <button type="submit" class="btn-primary neon-glow">Save Expense</button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Success State (Hidden by default) -->
+            <div class="modal-success-state" id="modalSuccessState" style="display: none;">
+                <div class="success-animation">
+                    <div class="success-icon">✅</div>
+                    <div class="success-ripple"></div>
+                </div>
+                
+                <div class="success-content">
+                    <h3>Expense Added Successfully!</h3>
+                    <div class="success-summary">
+                        <div class="expense-preview">
+                            <span class="expense-amount" id="successAmount">Rp 25.000</span>
+                            <span class="expense-category" id="successCategory">🍽️ Makanan</span>
+                            <span class="expense-date" id="successDate">Today</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Smart budget update -->
+                    <div class="success-budget-update" id="successBudgetUpdate" style="display: none;">
+                        <p class="budget-update-text" id="budgetUpdateText">
+                            <strong>Makanan</strong> budget: Rp 125.000 / Rp 500.000 (25%)
+                        </p>
+                        <div class="mini-progress-bar">
+                            <div class="mini-progress-fill" id="miniProgressFill" style="width: 25%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="success-actions">
+                    <button class="btn-secondary" id="addAnotherBtn">
+                        ➕ Add Another
+                    </button>
+                    <button class="btn-primary" id="viewDashboardBtn">
+                        📊 View Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    
+    <!-- App Scripts -->
+    <script src="config/firebase-config.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/expense.js?v=fix-duplicate-other-category"></script>
+    <script src="assets/js/dashboard.js?v=consolidated-v1.0"></script>
+    <!-- <script src="assets/js/budget.js"></script> DISABLED - using simple onboarding -->
+    <script src="assets/js/simple-onboarding.js?v=smart-error-focus-system"></script>
+    <script src="assets/js/app.js?v=disabled-expense-validation"></script>
+</body>
+</html>
