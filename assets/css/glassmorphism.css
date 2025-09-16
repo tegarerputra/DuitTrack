@@ -208,6 +208,23 @@
   flex-direction: column;
 }
 
+.dropdown-items:active,
+.dropdown-items:focus,
+.menu-main:active,
+.menu-main:focus,
+.menu-bottom:active,
+.menu-bottom:focus {
+  background: none !important;
+  background-color: transparent !important;
+}
+
+/* Prevent any unwanted active/focus states on dropdown containers */
+.menu-dropdown *:not(a):active,
+.menu-dropdown *:not(a):focus {
+  background: none !important;
+  background-color: transparent !important;
+}
+
 .menu-main {
   flex: 1;
   overflow-y: auto;

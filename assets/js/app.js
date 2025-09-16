@@ -67,8 +67,25 @@ class DuitTrackApp {
     
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
-      if (menuDropdown && !menuDropdown.contains(e.target)) {
+      console.log('📱 Document click detected, target:', e.target);
+
+      // Close if clicking completely outside dropdown
+      if (menuDropdown && !menuDropdown.contains(e.target) &&
+          (!menuToggle || !menuToggle.contains(e.target))) {
+        console.log('📱 Closing dropdown from outside click');
         this.closeDropdown();
+      }
+
+      // Also close if clicking on empty areas within dropdown (but not on menu items)
+      if (menuDropdown && menuDropdown.classList.contains('active')) {
+        const isEmptyArea = e.target.classList.contains('menu-main') ||
+                           e.target.classList.contains('menu-bottom') ||
+                           e.target.classList.contains('dropdown-items');
+
+        if (isEmptyArea) {
+          console.log('📱 Closing dropdown from empty area click');
+          this.closeDropdown();
+        }
       }
       
       // Close user dropdown when clicking outside
