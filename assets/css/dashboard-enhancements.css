@@ -400,3 +400,5 @@
 .budget-health-indicator.enhanced {
   animation: healthPulse 2s ease-in-out infinite;
 }
+
+/* Pull-to-refresh styles removed for better performance */

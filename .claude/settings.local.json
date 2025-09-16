@@ -53,7 +53,13 @@
       "WebSearch",
       "Bash(git add:*)",
       "Read(//d/**)",
-      "WebFetch(domain:127.0.0.1)"
+      "WebFetch(domain:127.0.0.1)",
+      "Bash(python:*)",
+      "Bash(git commit:*)",
+      "Read(//d//**)",
+      "Bash(find:*)",
+      "Bash(git config:*)",
+      "Bash(nslookup:*)"
     ],
     "deny": [],
     "ask": []

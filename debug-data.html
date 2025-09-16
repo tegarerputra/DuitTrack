@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Data Location</title>
+</head>
+<body>
+    <h1>Debug: Check Where Budget Data is Stored</h1>
+    <div id="status">Loading...</div>
+    <div id="results"></div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+    <script src="config/firebase-config.js"></script>
+    <script src="assets/js/budget-date-utils.js"></script>
+
+    <script>
+        const status = document.getElementById('status');
+        const results = document.getElementById('results');
+
+        async function debugBudgetData() {
+            // Wait for auth
+            await new Promise(resolve => {
+                const unsubscribe = firebase.auth().onAuthStateChanged(user => {
+                    if (user) {
+                        unsubscribe();
+                        resolve();
+                    }
+                });
+            });
+
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                status.innerHTML = '❌ Not authenticated';
+                return;
+            }
+
+            status.innerHTML = `✅ Authenticated as ${user.email}`;
+
+            const userId = user.uid;
+            const db = firebase.firestore();
+
+            // Test different period IDs for today
+            const testPeriods = [
+                window.budgetDateUtils.getCurrentPeriodId(1),   // Reset date 1
+                window.budgetDateUtils.getCurrentPeriodId(15),  // Reset date 15
+                window.budgetDateUtils.getCurrentPeriodId(25),  // Reset date 25
+                '2025-09',  // Legacy format
+            ];
+
+            let html = '<h2>Budget Data Check Results:</h2>';
+            html += '<table border="1"><tr><th>Period ID</th><th>Exists?</th><th>Data Preview</th></tr>';
+
+            for (const periodId of testPeriods) {
+                try {
+                    const docRef = db.collection('users').doc(userId).collection('budgets').doc(periodId);
+                    const doc = await docRef.get();
+
+                    if (doc.exists) {
+                        const data = doc.data();
+                        html += `<tr style="background: lightgreen"><td><b>${periodId}</b></td><td>✅ YES</td><td>Total: ${data.totalBudget || 0}, Categories: ${Object.keys(data.categories || {}).length}</td></tr>`;
+                    } else {
+                        html += `<tr><td>${periodId}</td><td>❌ No</td><td>-</td></tr>`;
+                    }
+                } catch (error) {
+                    html += `<tr style="background: lightyellow"><td>${periodId}</td><td>⚠️ Error</td><td>${error.message}</td></tr>`;
+                }
+            }
+
+            // Also check user profile for reset date
+            try {
+                const userDoc = await db.collection('users').doc(userId).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    html += `</table><h3>User Profile:</h3>`;
+                    html += `<p><b>Budget Reset Date:</b> ${userData.budgetResetDate || 'Not set'}</p>`;
+                    html += `<p><b>Onboarding Complete:</b> ${userData.onboardingComplete}</p>`;
+                }
+            } catch (error) {
+                html += `<p>Error loading user profile: ${error.message}</p>`;
+            }
+
+            results.innerHTML = html;
+        }
+
+        // Auto run when page loads
+        setTimeout(debugBudgetData, 2000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Period ID</title>
+</head>
+<body>
+    <h1>Period ID Debug</h1>
+    <div id="results"></div>
+
+    <script src="assets/js/budget-date-utils.js"></script>
+    <script>
+        const results = document.getElementById('results');
+
+        function test(resetDate) {
+            const periodId = window.budgetDateUtils.getCurrentPeriodId(resetDate);
+            const details = window.budgetDateUtils.getPeriodDetails(periodId);
+
+            return {
+                resetDate,
+                periodId,
+                displayName: details.displayName
+            };
+        }
+
+        // Test different reset dates
+        const testCases = [1, 15, 25];
+        let html = '<table border="1"><tr><th>Reset Date</th><th>Period ID</th><th>Display Name</th></tr>';
+
+        testCases.forEach(resetDate => {
+            const result = test(resetDate);
+            html += `<tr><td>${result.resetDate}</td><td>${result.periodId}</td><td>${result.displayName}</td></tr>`;
+        });
+
+        html += '</table>';
+        html += '<br><b>Today:</b> ' + new Date().toLocaleDateString();
+        html += '<br><b>Current Day:</b> ' + new Date().getDate();
+
+        results.innerHTML = html;
+    </script>
+</body>
+</html>

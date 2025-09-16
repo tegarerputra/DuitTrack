@@ -6,6 +6,7 @@
 class SimpleOnboarding {
   constructor() {
     this.categories = [];
+    this.selectedResetDate = 1; // Default to 1st of month
     this.init();
   }
 
@@ -31,6 +32,7 @@ class SimpleOnboarding {
     
     // Setup regardless of active class, as it might be activated later
     console.log('📝 Setting up simple onboarding components...');
+    this.setupResetDateOptions();
     this.setupSuggestions();
     this.setupAddCategory();
     this.setupFormSubmission();
@@ -45,6 +47,7 @@ class SimpleOnboarding {
       const onboardingPage = document.getElementById('budgetOnboardingPage');
       if (onboardingPage && onboardingPage.classList.contains('active')) {
         console.log('🎯 Onboarding page became active, re-setting up...');
+        this.setupResetDateOptions();
         this.setupSuggestions();
         this.setupAddCategory();
         this.setupFormSubmission();
@@ -103,6 +106,130 @@ class SimpleOnboarding {
       }, 2000); // Keep visible for 2 seconds before removing
       
     }, 400); // 400ms delay matches the animation
+  }
+
+  setupResetDateOptions() {
+    const presetsContainer = document.getElementById('resetDatePresets');
+    const customContainer = document.getElementById('resetDateCustom');
+    const customSelect = document.getElementById('customResetDate');
+
+    if (!presetsContainer || !customContainer || !customSelect) return;
+
+    // Create preset buttons for common dates
+    const presetOptions = [
+      { value: 1, label: '1st', description: 'Awal Bulan' },
+      { value: 15, label: '15th', description: 'Pertengahan' },
+      { value: 25, label: '25th', description: 'Akhir Bulan' }
+    ];
+
+    presetsContainer.innerHTML = '';
+    presetOptions.forEach(preset => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'reset-date-preset-btn';
+      button.dataset.resetDate = preset.value;
+      button.innerHTML = `
+        <div class="preset-label">${preset.label}</div>
+        <div class="preset-desc">${preset.description}</div>
+      `;
+
+      if (preset.value === this.selectedResetDate) {
+        button.classList.add('selected');
+      }
+
+      button.onclick = (e) => this.selectResetDate(preset.value, false);
+      presetsContainer.appendChild(button);
+    });
+
+    // Add "Custom" button
+    const customButton = document.createElement('button');
+    customButton.type = 'button';
+    customButton.className = 'reset-date-preset-btn custom-btn';
+    customButton.innerHTML = `
+      <div class="preset-label">Custom</div>
+      <div class="preset-desc">Choose Date</div>
+    `;
+    customButton.onclick = (e) => this.showCustomDateSelector();
+    presetsContainer.appendChild(customButton);
+
+    // Populate custom select with all dates
+    customSelect.innerHTML = '';
+    for (let i = 1; i <= 31; i++) {
+      const option = document.createElement('option');
+      option.value = i;
+      option.textContent = `Tanggal ${i}`;
+      customSelect.appendChild(option);
+    }
+
+    customSelect.addEventListener('change', (e) => {
+      this.selectResetDate(parseInt(e.target.value), true);
+    });
+
+    // Initialize preview
+    this.updateResetDatePreview();
+  }
+
+  selectResetDate(resetDate, isCustom = false) {
+    this.selectedResetDate = resetDate;
+
+    // Update UI
+    const presetButtons = document.querySelectorAll('.reset-date-preset-btn:not(.custom-btn)');
+    const customButton = document.querySelector('.reset-date-preset-btn.custom-btn');
+    const customContainer = document.getElementById('resetDateCustom');
+
+    // Clear all selections
+    presetButtons.forEach(btn => btn.classList.remove('selected'));
+    customButton.classList.remove('selected');
+
+    if (isCustom) {
+      customButton.classList.add('selected');
+      customContainer.style.display = 'block';
+      document.getElementById('customResetDate').value = resetDate;
+    } else {
+      // Find and select the matching preset button
+      const matchingButton = Array.from(presetButtons).find(btn =>
+        parseInt(btn.dataset.resetDate) === resetDate
+      );
+      if (matchingButton) {
+        matchingButton.classList.add('selected');
+      }
+      customContainer.style.display = 'none';
+    }
+
+    this.updateResetDatePreview();
+    console.log('📅 Reset date selected:', resetDate);
+  }
+
+  showCustomDateSelector() {
+    const customContainer = document.getElementById('resetDateCustom');
+    const customButton = document.querySelector('.reset-date-preset-btn.custom-btn');
+
+    // Clear preset selections
+    document.querySelectorAll('.reset-date-preset-btn:not(.custom-btn)').forEach(btn =>
+      btn.classList.remove('selected')
+    );
+
+    customButton.classList.add('selected');
+    customContainer.style.display = 'block';
+
+    // Focus on select
+    setTimeout(() => {
+      document.getElementById('customResetDate').focus();
+    }, 100);
+  }
+
+  updateResetDatePreview() {
+    const previewText = document.getElementById('previewPeriodText');
+    if (!previewText) return;
+
+    // Use budget date utils to calculate current period
+    const currentPeriodId = window.budgetDateUtils.getCurrentPeriodId(this.selectedResetDate);
+    const periodDetails = window.budgetDateUtils.getPeriodDetails(currentPeriodId);
+
+    previewText.textContent = periodDetails.displayName;
+
+    // Note: Removed redundant budgetPeriodInfo update since we removed that element
+    // Period info is now only shown in the preview card above
   }
 
   setupSuggestions() {
@@ -536,22 +663,30 @@ class SimpleOnboarding {
     const formElement = document.createElement('div');
     formElement.className = 'inline-add-form';
     formElement.innerHTML = `
-      <div class="simple-category-item" style="border: 2px dashed rgba(184, 134, 11, 0.4); background: rgba(184, 134, 11, 0.05);">
-        <div class="category-info">
-          <div class="category-icon" id="inlineEmojiPreview">💰</div>
-          <div class="category-details">
-            <input type="text" id="inlineCategoryName" class="glass-input" placeholder="Category name (e.g., Transport, Food)" style="margin-bottom: 8px; font-weight: 500;">
-            <input type="text" id="inlineCategoryDesc" class="glass-input" placeholder="Optional description" style="font-size: 14px; opacity: 0.8;">
-          </div>
+      <div class="simple-category-item" style="border: 2px dashed rgba(184, 134, 11, 0.4); background: rgba(184, 134, 11, 0.05); padding: 16px;">
+        <!-- Category Name Row with Emoji -->
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+          <div class="category-icon" id="inlineEmojiPreview" style="font-size: 24px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); border-radius: 6px; flex-shrink: 0;">💰</div>
+          <input type="text" id="inlineCategoryName" class="glass-input" placeholder="Category name (e.g., Transport, Food)" style="flex: 1; font-weight: 500; font-size: 16px;">
         </div>
-        <div class="budget-input-group">
+        
+        <!-- Description Field (Full Width) -->
+        <div style="margin-bottom: 12px;">
+          <input type="text" id="inlineCategoryDesc" class="glass-input" placeholder="Optional description" style="width: 100%; font-size: 14px; opacity: 0.8;">
+        </div>
+        
+        <!-- Budget Amount Field (Same as existing) -->
+        <div class="budget-input-group" style="margin-bottom: 8px;">
           <input type="text" id="inlineCategoryBudget" class="glass-input simple-budget-input" placeholder="0" min="0">
           <span class="currency">Rp</span>
         </div>
-        <div class="budget-warning" id="warning-inlineCategoryBudget" style="display: none; color: #ff4444; font-size: 12px; margin-top: 4px; text-align: right;">
+        
+        <div class="budget-warning" id="warning-inlineCategoryBudget" style="display: none; color: #ff4444; font-size: 12px; margin-bottom: 12px; text-align: right;">
           ⚠️ Max. Rp 999.999.999
         </div>
-        <div class="form-actions" style="margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end;">
+        
+        <!-- Form Actions -->
+        <div class="form-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
           <button type="button" class="cancel-btn" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; cursor: pointer;">Cancel</button>
           <button type="button" class="save-btn" style="padding: 8px 16px; background: rgba(184, 134, 11, 0.8); border: 1px solid rgba(184, 134, 11, 0.5); border-radius: 6px; color: #fff; cursor: pointer; font-weight: 500;">Add Category</button>
         </div>
@@ -995,86 +1130,33 @@ class SimpleOnboarding {
   }
 
   detectEmojiFromName(name) {
-    if (!name) return '💰';
-    
-    const lowercaseName = name.toLowerCase();
-    
-    // Enhanced category mappings based on user's actual budget data
-    const emojiMap = {
-      // Food categories - most used in user's data
-      'makan': '🍽️', 'food': '🍽️', 'makanan': '🍽️', 'restoran': '🍽️', 'masak': '🍳',
-      
-      // Transportation & Fuel - high budget item in user data  
-      'bensin': '⛽', 'gas': '⛽', 'bbm': '⛽', 'fuel': '⛽', 'isi bensin': '⛽',
-      'transport': '🚗', 'transportasi': '🚗', 'ojek': '🏍️', 'grab': '📱',
-      
-      // Utilities
-      'listrik': '⚡', 'electricity': '⚡', 'pln': '⚡',
-      
-      // Shopping
-      'belanja': '🛒', 'shopping': '🛒', 'groceries': '🛒', 'beli': '🛍️',
-      
-      // Snacks - significant category in user data
-      'jajan': '🍿', 'snack': '🍿', 'snacks': '🍿', 'cemilan': '🥨', 'kopi': '☕',
-      
-      // Fruits - specific category from user spreadsheet
-      'buah': '🍎', 'fruit': '🍎', 'semangka': '🍉', 'melon': '🍈', 
-      'jeruk': '🍊', 'pisang': '🍌', 'apel': '🍎', 'kelapa': '🥥', 'mangga': '🥭',
-      
-      // Household - major category in user data
-      'rumah': '🏠', 'household': '🏠', 'rumah tangga': '🏠', 'hous': '🏠', 'house': '🏠', 'sewa': '🏠',
-      
-      // Entertainment
-      'hiburan': '🎮', 'entertainment': '🎮', 'cinema': '🎬',
-      
-      // Health & Education
-      'kesehatan': '💊', 'health': '💊', 'dokter': '👨‍⚕️',
-      'pendidikan': '🎓', 'education': '🎓', 'sekolah': '🏫',
-      
-      // Clothing
-      'pakaian': '👕', 'clothes': '👕', 'fashion': '👗',
-      
-      // Family expenses (from user data: Nafkah Farah)
-      'nafkah': '👨‍👩‍👧‍👦', 'family': '👨‍👩‍👧‍👦', 'farah': '👩', 'anak': '👶'
-    };
-
-    for (const [key, emoji] of Object.entries(emojiMap)) {
-      if (lowercaseName.includes(key)) {
-        return emoji;
-      }
+    // Use CategoryService for consistency across all components
+    if (window.categoryService) {
+      return window.categoryService.getCategoryIcon(name);
     }
-
-    return '💰'; // default
+    
+    // Fallback to default icon if service not loaded
+    return '💰';
   }
 
   setupFormSubmission() {
-    const form = document.getElementById('budgetOnboardingForm');
-    const skipButton = document.getElementById('skipBudgetBtn');
+    const completeButton = document.getElementById('completeSetupBtn');
 
-    if (form) {
+    if (completeButton) {
       // Remove any existing event listeners first
-      form.onsubmit = null;
-      
+      completeButton.onclick = null;
+
       // Add new event listener
-      form.addEventListener('submit', (e) => {
+      completeButton.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log('🎯 Simple onboarding form submit triggered');
+        console.log('🎯 Complete Setup button clicked');
         this.submitBudget();
       });
     }
 
-    if (skipButton) {
-      // Remove any existing event listeners first
-      skipButton.onclick = null;
-      
-      skipButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('🎯 Simple onboarding skip triggered');
-        this.skipSetup();
-      });
-    }
+    // Note: Removed skip functionality as per user request
+    // User must complete onboarding - no skipping allowed
   }
 
   async submitBudget() {
@@ -1143,21 +1225,32 @@ class SimpleOnboarding {
       }
 
       // Show loading state
-      const submitBtn = document.querySelector('#budgetOnboardingForm button[type="submit"]');
+      const submitBtn = document.getElementById('completeSetupBtn');
       if (submitBtn) {
         submitBtn.classList.add('loading');
         submitBtn.textContent = 'Saving your awesome budget...';
         submitBtn.disabled = true;
       }
 
-      // Prepare data
+      // Prepare data with new budget period system
       const userId = window.auth.currentUser.uid;
-      const month = new Date().toISOString().slice(0, 7); // YYYY-MM
-      
+      const currentPeriodId = window.budgetDateUtils.getCurrentPeriodId(this.selectedResetDate);
+      const periodDetails = window.budgetDateUtils.getPeriodDetails(currentPeriodId);
+
+      console.log('🎯 ONBOARDING SAVE DEBUG:');
+      console.log('   - User ID:', userId);
+      console.log('   - Selected Reset Date:', this.selectedResetDate);
+      console.log('   - Calculated Period ID:', currentPeriodId);
+      console.log('   - Period Details:', periodDetails);
+
       const budgetData = {
         totalBudget: this.categories.reduce((sum, cat) => sum + cat.budget, 0),
         categories: {},
-        month: month,
+        periodId: currentPeriodId,
+        resetDate: this.selectedResetDate,
+        periodStart: periodDetails.start.toISOString(),
+        periodEnd: periodDetails.end.toISOString(),
+        displayName: periodDetails.displayName,
         createdAt: new Date().toISOString()
       };
 
@@ -1169,12 +1262,17 @@ class SimpleOnboarding {
         };
       });
 
-      // Save to Firestore
-      await window.db.collection('users').doc(userId).collection('budgets').doc(month).set(budgetData);
-      
-      // Mark onboarding complete
+      // Save budget data using new period ID format
+      console.log('💾 Saving budget data to Firestore path:', `users/${userId}/budgets/${currentPeriodId}`);
+      console.log('💾 Budget data being saved:', JSON.stringify(budgetData, null, 2));
+
+      await window.db.collection('users').doc(userId).collection('budgets').doc(currentPeriodId).set(budgetData);
+
+      // Save user settings and mark onboarding complete
       await window.db.collection('users').doc(userId).set({
         onboardingComplete: true,
+        budgetResetDate: this.selectedResetDate,
+        budgetResetEnabled: this.selectedResetDate !== 1, // Only true if not standard monthly
         lastUpdated: new Date().toISOString()
       }, { merge: true });
 
@@ -1189,7 +1287,7 @@ class SimpleOnboarding {
       this.showSystemError('Oops! Something went wrong saving your budget: ' + error.message);
       
       // Reset button state
-      const submitBtn = document.querySelector('#budgetOnboardingForm button[type="submit"]');
+      const submitBtn = document.getElementById('completeSetupBtn');
       if (submitBtn) {
         submitBtn.classList.remove('loading');
         submitBtn.textContent = 'Complete Setup';
@@ -1198,27 +1296,7 @@ class SimpleOnboarding {
     }
   }
 
-  async skipSetup() {
-    try {
-      if (!window.auth?.currentUser) {
-        this.showSystemError("Hold on! You need to sign in first!");
-        return;
-      }
-
-      const userId = window.auth.currentUser.uid;
-      await window.db.collection('users').doc(userId).set({
-        onboardingComplete: true,
-        skippedBudgetSetup: true,
-        lastUpdated: new Date().toISOString()
-      }, { merge: true });
-
-      console.log('✅ Skipped setup successfully!');
-      this.showDashboard();
-    } catch (error) {
-      console.error('❌ Error skipping setup:', error);
-      this.showSystemError('Uh oh! Something went wrong: ' + error.message);
-    }
-  }
+  // Note: Skip functionality removed - users must complete onboarding
 
   ensureAddButtonVisible() {
     const addButtonContainer = document.getElementById('addCategoryButton');

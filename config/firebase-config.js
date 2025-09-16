@@ -59,10 +59,23 @@ auth.onAuthStateChanged(async (user) => {
     const needsOnboarding = await checkUserOnboarding(user);
     
     if (needsOnboarding) {
-      showBudgetOnboarding();
+      if (typeof showBudgetOnboarding === 'function') {
+        showBudgetOnboarding();
+      } else {
+        console.warn('showBudgetOnboarding not available yet, retrying...');
+        setTimeout(() => showBudgetOnboarding(), 100);
+      }
     } else {
-      showDashboard();
-      loadUserData();
+      if (typeof showDashboard === 'function') {
+        showDashboard();
+        if (typeof loadUserData === 'function') loadUserData();
+      } else {
+        console.warn('showDashboard not available yet, retrying...');
+        setTimeout(() => {
+          showDashboard();
+          if (typeof loadUserData === 'function') loadUserData();
+        }, 100);
+      }
     }
   } else {
     // User is signed out
@@ -73,7 +86,12 @@ auth.onAuthStateChanged(async (user) => {
       window.app.setAuthenticationState(false, null);
     }
     
-    showLanding();
+    if (typeof showLanding === 'function') {
+      showLanding();
+    } else {
+      console.warn('showLanding not available yet, retrying...');
+      setTimeout(() => showLanding(), 100);
+    }
   }
 });
 
@@ -233,6 +251,44 @@ const FirebaseUtils = {
       
     } catch (error) {
       console.error('Error updating budget:', error);
+      throw error;
+    }
+  },
+
+  // Update an existing expense
+  updateExpense: async (expenseId, expenseData) => {
+    try {
+      const userId = currentUser?.uid;
+      if (!userId) throw new Error('User not authenticated');
+
+      const expenseRef = FirebaseUtils.getUserExpensesRef().doc(expenseId);
+      await expenseRef.update({
+        ...expenseData,
+        userId,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log('✅ Expense updated successfully:', expenseId);
+      return expenseId;
+    } catch (error) {
+      console.error('Error updating expense:', error);
+      throw error;
+    }
+  },
+
+  // Delete an expense
+  deleteExpense: async (expenseId) => {
+    try {
+      const userId = currentUser?.uid;
+      if (!userId) throw new Error('User not authenticated');
+
+      const expenseRef = FirebaseUtils.getUserExpensesRef().doc(expenseId);
+      await expenseRef.delete();
+
+      console.log('✅ Expense deleted successfully:', expenseId);
+      return true;
+    } catch (error) {
+      console.error('Error deleting expense:', error);
       throw error;
     }
   }

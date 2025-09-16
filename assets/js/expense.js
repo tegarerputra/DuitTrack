@@ -1,6 +1,6 @@
 // ========================================
-// DuitTrack - Expense Manager
-// Handles expense CRUD operations
+// DuitTrack - Optimized Expense Manager
+// Streamlined expense CRUD operations
 // ========================================
 
 class ExpenseManager {
@@ -8,9 +8,8 @@ class ExpenseManager {
     this.currentExpenses = [];
     this.categories = [];
     this.budgetData = null;
-    this.dailyWarnings = new Map(); // Track daily warnings: categoryThreshold -> timestamp
-    this.categoryCache = null;
-    this.lastCacheUpdate = null;
+    this.dailyWarnings = new Map(); // Track daily warnings to avoid spam
+    this.cache = new Map(); // Unified caching system
     this.CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
     this.init();
   }
@@ -57,11 +56,12 @@ class ExpenseManager {
       expenseForm.addEventListener('submit', (e) => this.handleExpenseSubmit(e));
     }
 
-    // Set default date to today
+    // Set default date to today with budget period constraints
     const expenseDate = document.getElementById('expenseDate');
     if (expenseDate) {
       const today = new Date().toISOString().split('T')[0];
       expenseDate.value = today;
+      this.setBudgetPeriodConstraints(expenseDate);
     }
 
     // Setup dropdown arrow states for category dropdown
@@ -72,9 +72,21 @@ class ExpenseManager {
 
     // Setup smart validation triggers
     this.setupSmartValidationTriggers();
-    
+
     // Setup enhanced date picker UX
     this.setupDatePickerEnhancements();
+
+    // Handle reset date changes from Budget
+    document.addEventListener('resetDateChanged', (e) => {
+      const newResetDate = e.detail.newResetDate;
+      console.log('📅 Expense Manager received reset date change:', newResetDate);
+
+      // Update date constraints for expense form
+      const expenseDate = document.getElementById('expenseDate');
+      if (expenseDate) {
+        this.setBudgetPeriodConstraints(expenseDate);
+      }
+    });
   }
 
   async openAddExpenseModal() {
@@ -96,18 +108,25 @@ class ExpenseManager {
       
       // Update dropdown after categories are loaded
       await this.updateCategoryDropdown();
-      
+
+      // If in edit mode, populate the form with existing data
+      if (this.isEditMode && this.editingExpenseData) {
+        this.populateEditForm(this.editingExpenseData);
+      }
+
       // Focus on amount input after everything is ready
       this.focusFirstField();
     }
   }
 
   async loadCategoriesWithCache() {
-    // Check if cache is still valid
-    if (this.categoryCache && this.lastCacheUpdate && 
-        (Date.now() - this.lastCacheUpdate < this.CACHE_DURATION)) {
+    const cacheKey = 'categories';
+    const cached = this.cache.get(cacheKey);
+    
+    // Check cache validity
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
       console.log('📂 Using cached categories');
-      this.categories = this.categoryCache;
+      this.categories = cached.data;
       return this.categories;
     }
 
@@ -116,8 +135,10 @@ class ExpenseManager {
     await this.loadCategories();
     
     // Update cache
-    this.categoryCache = [...this.categories];
-    this.lastCacheUpdate = Date.now();
+    this.cache.set(cacheKey, {
+      data: [...this.categories],
+      timestamp: Date.now()
+    });
     
     return this.categories;
   }
@@ -128,6 +149,9 @@ class ExpenseManager {
     if (expenseDate) {
       const today = new Date().toISOString().split('T')[0];
       expenseDate.value = today;
+
+      // Set date constraints based on current budget period
+      this.setBudgetPeriodConstraints(expenseDate);
     }
 
     // Clear smart warnings
@@ -161,6 +185,7 @@ class ExpenseManager {
     if (modal) {
       modal.classList.remove('active');
       this.resetForm();
+      this.resetEditMode(); // Reset edit mode when closing
     }
   }
 
@@ -168,13 +193,14 @@ class ExpenseManager {
     const form = document.getElementById('expenseForm');
     if (form) {
       form.reset();
-      // Set default date again
+      // Set default date and constraints again
       const expenseDate = document.getElementById('expenseDate');
       if (expenseDate) {
         const today = new Date().toISOString().split('T')[0];
         expenseDate.value = today;
+        this.setBudgetPeriodConstraints(expenseDate);
       }
-      
+
       // Clear all error states and smart warnings
       this.clearAllErrors();
       this.clearSmartWarnings();
@@ -219,130 +245,92 @@ class ExpenseManager {
   }
 
   // ========================================
-  // 📅 DATE PICKER ENHANCEMENTS
+  // 📅 SIMPLIFIED DATE PICKER SETUP
   // ========================================
 
   setupDatePickerEnhancements() {
     const dateInput = document.getElementById('expenseDate');
     if (!dateInput) return;
 
-    // Enhanced full-field clickable behavior
-    this.setupFullFieldClickable(dateInput);
-    
-    // Better typing experience
-    this.setupTypingEnhancements(dateInput);
-    
-    // Visual feedback improvements
-    this.setupDatePickerFeedback(dateInput);
-  }
-
-  setupFullFieldClickable(dateInput) {
-    // Make entire field area clickable to trigger date picker
-    dateInput.addEventListener('click', (e) => {
-      // Ensure date picker opens when clicking anywhere on the field
-      if (!dateInput.matches(':focus')) {
-        dateInput.focus();
-      }
-      
-      // For WebKit browsers, trigger the calendar picker
-      if (dateInput.showPicker && typeof dateInput.showPicker === 'function') {
-        try {
-          dateInput.showPicker();
-        } catch (error) {
-          // Fallback: showPicker might not be supported in all browsers
-          console.debug('showPicker not supported, using native behavior');
-        }
-      }
-    });
-
-    // Improve keyboard navigation
-    dateInput.addEventListener('keydown', (e) => {
-      // Space or Enter should open date picker
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        if (dateInput.showPicker && typeof dateInput.showPicker === 'function') {
-          try {
-            dateInput.showPicker();
-          } catch (error) {
-            // Fallback: focus and let native behavior handle it
-            dateInput.focus();
-          }
-        }
-      }
-    });
-  }
-
-  setupTypingEnhancements(dateInput) {
-    // Allow direct typing with format validation
+    // Basic date validation on input
     dateInput.addEventListener('input', (e) => {
-      const value = e.target.value;
-      
-      // Clear any previous date validation errors when user starts typing
-      this.clearFieldError('expenseDate');
-      
-      // Auto-format if user types numbers (basic format assistance)
-      if (value && value.length >= 10) { // Full date format: YYYY-MM-DD
-        this.validateDateInput(value);
+      this.clearFieldError(dateInput);
+      if (e.target.value && e.target.value.length >= 10) {
+        this.validateDateInput(e.target.value);
       }
     });
 
-    // Enhanced focus behavior
-    dateInput.addEventListener('focus', () => {
-      // Add visual feedback that field is active
-      dateInput.parentElement.classList.add('date-focused');
-    });
-
+    // Validate on blur
     dateInput.addEventListener('blur', () => {
-      // Remove visual feedback
-      dateInput.parentElement.classList.remove('date-focused');
-      
-      // Validate date when user leaves field
       if (dateInput.value) {
         this.validateDateInput(dateInput.value);
       }
     });
-  }
 
-  setupDatePickerFeedback(dateInput) {
-    // Enhanced hover effect for better UX indication
-    dateInput.addEventListener('mouseenter', () => {
-      dateInput.style.transform = 'translateY(-1px)';
-    });
-
-    dateInput.addEventListener('mouseleave', () => {
-      dateInput.style.transform = 'translateY(0)';
-    });
-
-    // Calendar icon glow effect on hover
-    dateInput.addEventListener('mouseenter', () => {
-      dateInput.classList.add('date-hover-glow');
-    });
-
-    dateInput.addEventListener('mouseleave', () => {
-      dateInput.classList.remove('date-hover-glow');
-    });
+    // Enable showPicker if supported (modern browsers)
+    if (dateInput.showPicker) {
+      dateInput.addEventListener('click', () => {
+        try {
+          dateInput.showPicker();
+        } catch (error) {
+          // Fallback to native behavior
+        }
+      });
+    }
   }
 
   validateDateInput(dateValue) {
     const date = new Date(dateValue);
     const today = new Date();
-    
+
     // Check if date is valid
     if (isNaN(date.getTime())) {
-      this.showFieldError('expenseDate', '📅 Please enter a valid date');
+      this.showFieldError(document.getElementById('expenseDate'), '📅 Please enter a valid date');
       return false;
     }
-    
+
+    // Check if date is within current budget period (if budget periods are configured)
+    if (window.budgetDateUtils && window.DashboardManager?.userResetDate) {
+      const currentPeriodId = window.budgetDateUtils.getCurrentPeriodId(window.DashboardManager.userResetDate);
+      if (!window.budgetDateUtils.isDateInPeriod(date, currentPeriodId)) {
+        const periodDetails = window.budgetDateUtils.getPeriodDetails(currentPeriodId);
+        const startDate = periodDetails.start.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        const endDate = periodDetails.end.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        this.showFieldError(document.getElementById('expenseDate'), `📅 Date must be within current budget period: ${startDate} - ${endDate}`);
+        return false;
+      }
+    }
+
     // Check if date is not too far in the future (more than 1 year)
     const oneYearFromNow = new Date();
     oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
-    
+
     if (date > oneYearFromNow) {
-      this.showFieldError('expenseDate', '📅 Date cannot be more than 1 year in the future');
+      this.showFieldError(document.getElementById('expenseDate'), '📅 Date cannot be more than 1 year in the future');
       return false;
     }
-    
+
     return true;
+  }
+
+  setBudgetPeriodConstraints(dateInput) {
+    if (!window.budgetDateUtils || !window.DashboardManager?.userResetDate) return;
+
+    try {
+      const currentPeriodId = window.budgetDateUtils.getCurrentPeriodId(window.DashboardManager.userResetDate);
+      const periodDetails = window.budgetDateUtils.getPeriodDetails(currentPeriodId);
+
+      // Set min and max dates based on current budget period
+      const minDate = periodDetails.start.toISOString().split('T')[0];
+      const maxDate = periodDetails.end.toISOString().split('T')[0];
+
+      dateInput.setAttribute('min', minDate);
+      dateInput.setAttribute('max', maxDate);
+
+      console.log('📅 Expense date constraints set:', { minDate, maxDate, periodId: currentPeriodId });
+    } catch (error) {
+      console.warn('⚠️ Could not set budget period constraints:', error);
+    }
   }
 
   // ========================================
@@ -420,8 +408,10 @@ class ExpenseManager {
       }
 
       console.log('🧠 Loading budget data for smart validation...');
-      const currentMonth = window.FirebaseUtils?.getCurrentMonth() || this.getCurrentMonth();
-      const budgetRef = window.FirebaseUtils.getUserBudgetsRef().doc(currentMonth);
+      const currentPeriodId = window.DashboardManager?.currentPeriodId ||
+                              (window.budgetDateUtils?.getCurrentPeriodId(window.DashboardManager?.userResetDate || 1)) ||
+                              this.getCurrentMonth();
+      const budgetRef = window.FirebaseUtils.getUserBudgetsRef().doc(currentPeriodId);
       const budgetDoc = await budgetRef.get();
 
       if (budgetDoc.exists) {
@@ -554,15 +544,26 @@ class ExpenseManager {
       // Show loading state
       this.setSubmitButtonLoading(true);
 
-      // Create expense in Firestore
-      const expenseId = await this.createExpense(formData);
-
-      // NEW: Show progressive success state instead of immediate close
-      await this.showSuccessState(formData, expenseId);
+      let expenseId;
+      if (this.isEditMode) {
+        // Update existing expense
+        expenseId = await this.handleExpenseUpdate(formData);
+        await this.showSuccessState(formData, expenseId, 'updated');
+      } else {
+        // Create new expense
+        expenseId = await this.createExpense(formData);
+        await this.showSuccessState(formData, expenseId, 'created');
+      }
       
       // Trigger dashboard refresh (happens in background)
       document.dispatchEvent(new CustomEvent('expenseAdded'));
-      console.log('✅ Expense created with ID:', expenseId);
+
+      // Refresh Expenses if we're in edit mode
+      if (this.isEditMode) {
+        await this.loadExpenses();
+      }
+
+      console.log(`✅ Expense ${this.isEditMode ? 'updated' : 'created'} with ID:`, expenseId);
 
     } catch (error) {
       console.error('❌ Error creating expense:', error);
@@ -611,15 +612,16 @@ class ExpenseManager {
         category: expenseData.category.toUpperCase(),
         description: expenseData.description,
         date: expenseData.date,
-        month: expenseData.date.substring(0, 7), // YYYY-MM format
+        month: this.getExpenseMonth(expenseData.date), // Support both period ID and YYYY-MM format
         createdAt: new Date().toISOString()
       };
 
       const expenseId = await window.FirebaseUtils.createExpense(expenseDoc);
       
-      // Update budget tracking
+      // Update budget tracking - use appropriate period format
+      const budgetPeriod = this.getExpenseMonth(expenseDoc.date);
       await window.FirebaseUtils.updateBudgetSpent(
-        expenseDoc.month,
+        budgetPeriod,
         expenseDoc.category.toLowerCase(),
         expenseDoc.amount,
         'add'
@@ -635,13 +637,13 @@ class ExpenseManager {
 
 
   getCategoryIcon(category) {
-    const icons = {
-      'FOOD': '🍔',
-      'SNACK': '🍿',
-      'HOUSEHOLD': '🏠',
-      'FRUIT': '🍎'
-    };
-    return icons[category.toUpperCase()] || '💰';
+    // Use CategoryService for dynamic icon mapping
+    if (window.categoryService) {
+      return window.categoryService.getCategoryIcon(category);
+    }
+    
+    // Fallback to default icon if service not loaded
+    return '💰';
   }
 
   formatCategoryName(category) {
@@ -681,16 +683,14 @@ class ExpenseManager {
   }
 
   // ========================================
-  // 🎯 3-LAYER ERROR HANDLING SYSTEM
+  // 🎯 SIMPLIFIED ERROR HANDLING
   // ========================================
 
-  // Layer 1: Field-Level Errors (Below inputs)
   showFieldError(input, message) {
     input.classList.add('error-state');
     const errorContainer = this.getOrCreateErrorContainer(input);
     errorContainer.textContent = message;
     errorContainer.style.display = 'block';
-    errorContainer.classList.add('show');
   }
 
   clearFieldError(input) {
@@ -698,49 +698,25 @@ class ExpenseManager {
     const errorContainer = document.getElementById(input.id + '-error');
     if (errorContainer) {
       errorContainer.style.display = 'none';
-      errorContainer.classList.remove('show');
     }
   }
 
-  // Layer 2: Form-Level Errors (Above form actions)
-  showFormError(message) {
-    this.clearFormErrors();
-    const formActions = document.querySelector('.form-actions');
-    if (formActions) {
-      const errorContainer = document.createElement('div');
-      errorContainer.className = 'form-error-container';
-      errorContainer.innerHTML = `<div class="form-error field-error show">${message}</div>`;
-      formActions.parentNode.insertBefore(errorContainer, formActions);
-      
-      // Auto-remove after 8 seconds
-      setTimeout(() => {
-        if (errorContainer.parentNode) {
-          errorContainer.remove();
-        }
-      }, 8000);
-    }
-  }
-
-  // Layer 3: System-Level Errors (Below submit button)
   showSystemError(message) {
-    this.clearSystemErrors();
     const formActions = document.querySelector('.form-actions');
     if (formActions) {
+      // Remove any existing error
+      const existing = formActions.parentNode.querySelector('.system-error-container');
+      if (existing) existing.remove();
+      
       const errorContainer = document.createElement('div');
       errorContainer.className = 'system-error-container';
       errorContainer.innerHTML = `<div class="system-error field-error show">${message}</div>`;
       formActions.parentNode.appendChild(errorContainer);
       
-      // Auto-remove after 12 seconds
-      setTimeout(() => {
-        if (errorContainer.parentNode) {
-          errorContainer.remove();
-        }
-      }, 12000);
+      setTimeout(() => errorContainer.remove(), 8000);
     }
   }
 
-  // Smart error container creation
   getOrCreateErrorContainer(input) {
     let errorContainer = document.getElementById(input.id + '-error');
     if (!errorContainer) {
@@ -748,39 +724,19 @@ class ExpenseManager {
       errorContainer.className = 'field-error';
       errorContainer.id = input.id + '-error';
       
-      // Handle currency input groups vs regular inputs
       const currencyGroup = input.closest('.currency-input-group');
       if (currencyGroup) {
-        // Place error after currency-input-group
         currencyGroup.parentNode.insertBefore(errorContainer, currencyGroup.nextSibling);
       } else {
-        // Place error after regular input
         input.parentNode.insertBefore(errorContainer, input.nextSibling);
       }
     }
     return errorContainer;
   }
 
-  // Clear all error states
   clearAllErrors() {
-    this.clearAllFieldErrors();
-    this.clearFormErrors();
-    this.clearSystemErrors();
-  }
-
-  clearAllFieldErrors() {
-    const errorInputs = document.querySelectorAll('.glass-input.error-state');
-    errorInputs.forEach(input => this.clearFieldError(input));
-  }
-
-  clearFormErrors() {
-    const formErrors = document.querySelectorAll('.form-error-container');
-    formErrors.forEach(container => container.remove());
-  }
-
-  clearSystemErrors() {
-    const systemErrors = document.querySelectorAll('.system-error-container');
-    systemErrors.forEach(container => container.remove());
+    document.querySelectorAll('.glass-input.error-state').forEach(input => this.clearFieldError(input));
+    document.querySelectorAll('.system-error-container').forEach(container => container.remove());
   }
 
   // ========================================
@@ -845,9 +801,11 @@ class ExpenseManager {
         return;
       }
 
-      // Load budget categories from Firestore
-      const currentMonth = window.FirebaseUtils?.getCurrentMonth() || this.getCurrentMonth();
-      const budgetRef = window.FirebaseUtils.getUserBudgetsRef().doc(currentMonth);
+      // Load budget categories from Firestore using current budget period
+      const currentPeriodId = window.DashboardManager?.currentPeriodId ||
+                              (window.budgetDateUtils?.getCurrentPeriodId(window.DashboardManager?.userResetDate || 1)) ||
+                              this.getCurrentMonth();
+      const budgetRef = window.FirebaseUtils.getUserBudgetsRef().doc(currentPeriodId);
       const budgetDoc = await budgetRef.get();
 
       if (budgetDoc.exists && budgetDoc.data().categories) {
@@ -961,12 +919,8 @@ class ExpenseManager {
       this.showFieldError(dateInput, "Don't leave me empty! I need a date!");
       hasErrors = true;
     } else {
-      const selectedDate = new Date(data.date);
-      const today = new Date();
-      today.setHours(23, 59, 59, 999); // End of today
-      
-      if (selectedDate > today) {
-        this.showFieldError(dateInput, "Time travel expenses not allowed! Use today or past dates");
+      // Use the enhanced date validation
+      if (!this.validateDateInput(data.date)) {
         hasErrors = true;
       }
     }
@@ -1047,6 +1001,52 @@ class ExpenseManager {
     return `${year}-${month}`;
   }
 
+  getCurrentBudgetPeriod() {
+    // Get current budget period based on dashboard settings
+    if (window.DashboardManager?.currentPeriodId) {
+      return window.DashboardManager.currentPeriodId;
+    }
+
+    // Fallback using budget date utils
+    if (window.budgetDateUtils && window.DashboardManager?.userResetDate) {
+      return window.budgetDateUtils.getCurrentPeriodId(window.DashboardManager.userResetDate);
+    }
+
+    // Final fallback to calendar month
+    return this.getCurrentMonth();
+  }
+
+  getExpenseMonth(expenseDate) {
+    // If budget periods are configured, use current period ID
+    if (window.budgetDateUtils && window.DashboardManager?.userResetDate) {
+      const date = new Date(expenseDate);
+      const userResetDate = window.DashboardManager.userResetDate;
+
+      // Determine which budget period this expense belongs to
+      const currentDay = date.getDate();
+      const currentPeriodId = window.budgetDateUtils.getCurrentPeriodId(userResetDate);
+
+      // Check if the expense date falls in the current period
+      if (window.budgetDateUtils.isDateInPeriod(date, currentPeriodId)) {
+        return currentPeriodId; // Return period ID format
+      }
+
+      // If not current period, calculate the appropriate period
+      if (currentDay < userResetDate) {
+        // Previous period
+        const prevMonth = new Date(date.getFullYear(), date.getMonth() - 1, userResetDate);
+        return window.budgetDateUtils.formatPeriodId(prevMonth);
+      } else {
+        // Current period starting from reset date
+        const currentPeriod = new Date(date.getFullYear(), date.getMonth(), userResetDate);
+        return window.budgetDateUtils.formatPeriodId(currentPeriod);
+      }
+    }
+
+    // Fallback to YYYY-MM format
+    return expenseDate.substring(0, 7);
+  }
+
   showErrorMessage(message) {
     this.showSystemError(message);
     console.error('❌', message);
@@ -1061,14 +1061,15 @@ class ExpenseManager {
   // ✨ PROGRESSIVE SUCCESS STATE SYSTEM
   // ========================================
 
-  async showSuccessState(expenseData, expenseId) {
+  async showSuccessState(expenseData, expenseId, action = 'created') {
     try {
       const formContent = document.getElementById('modalFormContent');
       const successState = document.getElementById('modalSuccessState');
-      
+
       if (!formContent || !successState) {
         console.error('Modal elements not found, falling back to toast');
-        this.showSuccessMessage('Expense added successfully! 💰');
+        const message = action === 'updated' ? 'Expense updated successfully! ✏️' : 'Expense added successfully! 💰';
+        this.showSuccessMessage(message);
         this.closeAddExpenseModal();
         return;
       }
@@ -1170,6 +1171,7 @@ class ExpenseManager {
       const newAddAnotherBtn = document.getElementById('addAnotherBtn');
       
       newAddAnotherBtn.addEventListener('click', () => {
+        this.resetEditMode(); // Reset edit mode first
         this.resetToFormState();
         this.resetForm();
         this.clearSmartWarnings();
@@ -1215,50 +1217,68 @@ class ExpenseManager {
     }
   }
 
-  // ========================================
-  // 🚀 PERFORMANCE OPTIMIZATION METHODS
-  // ========================================
-
+  // Cache management
   invalidateCache() {
-    this.categoryCache = null;
-    this.lastCacheUpdate = null;
+    this.cache.clear();
     this.budgetData = null;
-    console.log('🚀 Cache invalidated - will refresh on next load');
+    console.log('🚀 Cache invalidated');
   }
 
-  // Public method to refresh cache (called when budget changes)
   async refreshCategories() {
     this.invalidateCache();
     await this.loadCategoriesWithCache();
     await this.updateCategoryDropdown();
-    console.log('🔄 Categories refreshed successfully');
   }
 
   // ========================================
   // 💫 MONEY MOVES PAGE FUNCTIONALITY
   // ========================================
 
-  async loadExpenses(month = null) {
+  async loadExpenses(periodId = null) {
     try {
-      console.log('💫 Loading Money Moves page...');
-      
+      console.log('💸 Loading Expenses page...');
+      console.log('🔍 DEBUG - Auth status:', {
+        authExists: !!window.auth,
+        currentUser: !!window.auth?.currentUser,
+        userEmail: window.auth?.currentUser?.email
+      });
+
       if (!window.auth?.currentUser) {
         console.warn('⚠️ No authenticated user found');
         this.showEmptyExpensesState();
         return;
       }
 
-      const targetMonth = month || this.getCurrentMonth();
-      console.log('📅 Loading expenses for month:', targetMonth);
+      // Use budget period system instead of calendar months
+      const targetPeriod = periodId || this.getCurrentBudgetPeriod();
+      console.log('📅 Loading expenses for period:', targetPeriod);
       
       // Show loading state
       this.showExpensesLoading();
       
       // Load expenses from Firestore
+      console.log('🔍 DEBUG - Getting expenses reference...');
       const expensesRef = window.FirebaseUtils.getUserExpensesRef();
-      const snapshot = await expensesRef
-        .where('month', '==', targetMonth)
+      console.log('🔍 DEBUG - Querying Firestore for period:', targetPeriod);
+
+      // Try period ID first, then fallback to YYYY-MM format
+      let snapshot = await expensesRef
+        .where('month', '==', targetPeriod)
         .get();
+
+      // If no results and period looks like YYYY-MM-DD, try YYYY-MM format
+      if (snapshot.empty && targetPeriod.length > 7) {
+        const monthFormat = targetPeriod.substring(0, 7); // Extract YYYY-MM
+        console.log(`🔍 No data found for period ${targetPeriod}, trying month format ${monthFormat}`);
+        snapshot = await expensesRef
+          .where('month', '==', monthFormat)
+          .get();
+      }
+        
+      console.log('🔍 DEBUG - Firestore query completed:', {
+        empty: snapshot.empty,
+        size: snapshot.size
+      });
         
       this.currentExpenses = [];
       snapshot.forEach(doc => {
@@ -1273,10 +1293,11 @@ class ExpenseManager {
       });
 
       console.log(`✅ Loaded ${this.currentExpenses.length} expenses`);
+      console.log('🔍 DEBUG - Expenses data:', this.currentExpenses);
       
       // Update UI
       this.updateExpensesTimeline();
-      this.setupMonthSelector(targetMonth);
+      this.setupPeriodSelector(targetPeriod);
       this.setupEmptyStateActions();
       
     } catch (error) {
@@ -1286,9 +1307,18 @@ class ExpenseManager {
   }
 
   updateExpensesTimeline() {
+    console.log('🔍 DEBUG - updateExpensesTimeline called');
+    console.log('🔍 DEBUG - currentExpenses.length:', this.currentExpenses.length);
+    
     const timeline = document.getElementById('expensesTimeline');
     const loading = document.getElementById('expensesLoading');
     const empty = document.getElementById('expensesEmpty');
+    
+    console.log('🔍 DEBUG - DOM elements found:', {
+      timeline: !!timeline,
+      loading: !!loading,
+      empty: !!empty
+    });
     
     if (!timeline) return;
     
@@ -1296,10 +1326,16 @@ class ExpenseManager {
     if (loading) loading.style.display = 'none';
     
     if (this.currentExpenses.length === 0) {
+      console.log('🔍 DEBUG - No expenses found, showing empty state');
       timeline.innerHTML = '';
-      if (empty) empty.style.display = 'block';
+      if (empty) {
+        empty.style.display = 'block';
+        console.log('🔍 DEBUG - Empty state shown');
+      }
       return;
     }
+    
+    console.log('🔍 DEBUG - Expenses found, hiding empty state and rendering timeline');
     
     // Hide empty state
     if (empty) empty.style.display = 'none';
@@ -1359,6 +1395,14 @@ class ExpenseManager {
           <div class="expense-category">${this.formatCategoryName(expense.category)}</div>
         </div>
         <div class="expense-amount">${this.formatRupiah(expense.amount)}</div>
+        <div class="expense-actions">
+          <button class="expense-action-btn edit-btn" onclick="window.ExpenseManager.editExpense('${expense.id}')" title="Edit expense">
+            ✏️
+          </button>
+          <button class="expense-action-btn delete-btn" onclick="window.ExpenseManager.deleteExpense('${expense.id}')" title="Delete expense">
+            🗑️
+          </button>
+        </div>
       </div>
     `;
   }
@@ -1384,46 +1428,56 @@ class ExpenseManager {
     }
   }
 
-  setupMonthSelector(selectedMonth) {
-    const monthSelector = document.getElementById('expenseMonthSelector');
-    if (!monthSelector) return;
+  setupPeriodSelector(selectedPeriod) {
+    const periodSelector = document.getElementById('expenseMonthSelector');
+    if (!periodSelector) return;
 
     // Clear existing options
-    monthSelector.innerHTML = '';
+    periodSelector.innerHTML = '';
 
-    // Generate last 12 months
-    const months = this.generateMonthOptions();
-    
-    months.forEach(month => {
+    // Generate budget periods
+    const periods = this.generatePeriodOptions();
+
+    periods.forEach(period => {
       const option = document.createElement('option');
-      option.value = month.value;
-      option.textContent = month.display;
-      option.selected = month.value === selectedMonth;
-      monthSelector.appendChild(option);
+      option.value = period.id;
+      option.textContent = period.displayName;
+      option.selected = period.id === selectedPeriod;
+      periodSelector.appendChild(option);
     });
 
-    // Setup change event
-    monthSelector.addEventListener('change', (e) => {
+    // Setup change event (remove existing listeners first)
+    const newSelector = periodSelector.cloneNode(true);
+    periodSelector.parentNode.replaceChild(newSelector, periodSelector);
+
+    newSelector.addEventListener('change', (e) => {
       this.loadExpenses(e.target.value);
     });
   }
 
-  generateMonthOptions() {
+  generatePeriodOptions() {
+    // Use budget periods if available, otherwise fallback to months
+    if (window.budgetDateUtils && window.DashboardManager?.userResetDate) {
+      return window.budgetDateUtils.getAvailablePeriods(window.DashboardManager.userResetDate, 12);
+    }
+
+    // Fallback to calendar months
     const months = [];
     const current = new Date();
-    
+
     for (let i = 0; i < 12; i++) {
       const monthDate = new Date(current.getFullYear(), current.getMonth() - i, 1);
       const monthStr = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
-      
-      const displayName = monthDate.toLocaleDateString('en-US', {
+
+      const displayName = monthDate.toLocaleDateString('id-ID', {
         month: 'long',
         year: 'numeric'
       });
 
       months.push({
-        value: monthStr,
-        display: displayName
+        id: monthStr,
+        displayName: displayName,
+        isCurrent: i === 0
       });
     }
 
@@ -1479,6 +1533,238 @@ class ExpenseManager {
         this.openAddExpenseModal();
       });
     }
+  }
+
+  // ========================================
+  // ✏️ EDIT EXPENSE FUNCTIONALITY
+  // ========================================
+
+  async editExpense(expenseId) {
+    try {
+      console.log('✏️ Editing expense:', expenseId);
+
+      // Find the expense in current data
+      const expense = this.currentExpenses.find(exp => exp.id === expenseId);
+      if (!expense) {
+        console.error('Expense not found:', expenseId);
+        return;
+      }
+
+      // Set edit mode flag BEFORE opening modal
+      this.isEditMode = true;
+      this.editingExpenseId = expenseId;
+      this.editingExpenseData = expense; // Store the expense data
+
+      // Open the modal and wait for it to be fully ready
+      await this.openAddExpenseModal();
+
+      // Update modal title and button text
+      this.updateModalForEdit();
+
+    } catch (error) {
+      console.error('❌ Error opening edit expense:', error);
+    }
+  }
+
+  populateEditForm(expense) {
+    console.log('📝 Populating edit form with:', expense);
+
+    // Populate amount
+    const amountInput = document.getElementById('expenseAmount');
+    if (amountInput) {
+      const formattedAmount = this.addThousandSeparators(expense.amount.toString());
+      amountInput.value = formattedAmount;
+      console.log('✅ Amount populated:', formattedAmount);
+    } else {
+      console.error('❌ Amount input not found');
+    }
+
+    // Populate category
+    const categorySelect = document.getElementById('expenseCategory');
+    if (categorySelect) {
+      categorySelect.value = expense.category;
+      console.log('✅ Category populated:', expense.category);
+
+      // Trigger change event to update dropdown appearance
+      categorySelect.dispatchEvent(new Event('change'));
+    } else {
+      console.error('❌ Category select not found');
+    }
+
+    // Populate description
+    const descriptionInput = document.getElementById('expenseDescription');
+    if (descriptionInput) {
+      descriptionInput.value = expense.description || '';
+      console.log('✅ Description populated:', expense.description || '(empty)');
+    } else {
+      console.error('❌ Description input not found');
+    }
+
+    // Populate date
+    const dateInput = document.getElementById('expenseDate');
+    if (dateInput) {
+      // Convert date to YYYY-MM-DD format for input
+      const expenseDate = expense.date?.toDate ? expense.date.toDate() : new Date(expense.date);
+      const dateStr = expenseDate.toISOString().split('T')[0];
+      dateInput.value = dateStr;
+      console.log('✅ Date populated:', dateStr);
+
+      // Set budget period constraints
+      this.setBudgetPeriodConstraints(dateInput);
+    } else {
+      console.error('❌ Date input not found');
+    }
+
+    console.log('✅ Edit form population completed');
+  }
+
+  updateModalForEdit() {
+    // Update modal title
+    const modalTitle = document.querySelector('#addExpenseModal .modal-title');
+    if (modalTitle) {
+      modalTitle.textContent = 'Edit Expense';
+    }
+
+    // Update submit button text
+    const submitBtn = document.querySelector('#expenseForm button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.textContent = 'Update Expense';
+    }
+  }
+
+  async handleExpenseUpdate(formData) {
+    try {
+      // Update expense in Firestore
+      const expenseDoc = {
+        amount: formData.amount,
+        category: formData.category.toUpperCase(),
+        description: formData.description,
+        date: formData.date,
+        month: this.getExpenseMonth(formData.date),
+        updatedAt: new Date().toISOString()
+      };
+
+      await window.FirebaseUtils.updateExpense(this.editingExpenseId, expenseDoc);
+
+      // Update budget tracking (remove old, add new)
+      const oldExpense = this.currentExpenses.find(exp => exp.id === this.editingExpenseId);
+      if (oldExpense) {
+        // Remove old amount
+        const oldBudgetPeriod = this.getExpenseMonth(oldExpense.date?.toDate ? oldExpense.date.toDate().toISOString().split('T')[0] : oldExpense.date);
+        await window.FirebaseUtils.updateBudgetSpent(
+          oldBudgetPeriod,
+          oldExpense.category.toLowerCase(),
+          oldExpense.amount,
+          'subtract'
+        );
+
+        // Add new amount
+        const newBudgetPeriod = this.getExpenseMonth(expenseDoc.date);
+        await window.FirebaseUtils.updateBudgetSpent(
+          newBudgetPeriod,
+          expenseDoc.category.toLowerCase(),
+          expenseDoc.amount,
+          'add'
+        );
+      }
+
+      console.log('✅ Expense updated successfully');
+      return this.editingExpenseId;
+
+    } catch (error) {
+      console.error('❌ Error updating expense:', error);
+      throw error;
+    }
+  }
+
+  resetEditMode() {
+    this.isEditMode = false;
+    this.editingExpenseId = null;
+    this.editingExpenseData = null; // Clear stored expense data
+
+    // Reset modal title
+    const modalTitle = document.querySelector('#addExpenseModal .modal-title');
+    if (modalTitle) {
+      modalTitle.textContent = 'Add Expense';
+    }
+
+    // Reset submit button text
+    const submitBtn = document.querySelector('#expenseForm button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.textContent = 'Save Expense';
+    }
+
+    console.log('🔄 Edit mode reset');
+  }
+
+  // ========================================
+  // 🗑️ DELETE EXPENSE FUNCTIONALITY
+  // ========================================
+
+  async deleteExpense(expenseId) {
+    try {
+      console.log('🗑️ Deleting expense:', expenseId);
+
+      // Find the expense
+      const expense = this.currentExpenses.find(exp => exp.id === expenseId);
+      if (!expense) {
+        console.error('Expense not found:', expenseId);
+        return;
+      }
+
+      // Show confirmation dialog
+      const confirmed = await this.showDeleteConfirmation(expense);
+      if (!confirmed) return;
+
+      // Delete from Firestore
+      await window.FirebaseUtils.deleteExpense(expenseId);
+
+      // Update budget tracking (subtract the amount)
+      const budgetPeriod = this.getExpenseMonth(expense.date?.toDate ? expense.date.toDate().toISOString().split('T')[0] : expense.date);
+      await window.FirebaseUtils.updateBudgetSpent(
+        budgetPeriod,
+        expense.category.toLowerCase(),
+        expense.amount,
+        'subtract'
+      );
+
+      // Refresh the Expenses page
+      await this.loadExpenses();
+
+      // Trigger dashboard refresh
+      document.dispatchEvent(new CustomEvent('expenseAdded'));
+
+      console.log('✅ Expense deleted successfully');
+
+    } catch (error) {
+      console.error('❌ Error deleting expense:', error);
+      this.showSystemError('Failed to delete expense. Please try again.');
+    }
+  }
+
+  showDeleteConfirmation(expense) {
+    return new Promise((resolve) => {
+      const amount = this.formatRupiah(expense.amount);
+      const category = this.formatCategoryName(expense.category);
+      const description = expense.description || 'No description';
+
+      const confirmed = confirm(
+        `Are you sure you want to delete this expense?\n\n` +
+        `Amount: ${amount}\n` +
+        `Category: ${category}\n` +
+        `Description: ${description}\n\n` +
+        `This action cannot be undone.`
+      );
+
+      resolve(confirmed);
+    });
+  }
+
+  // Memory management
+  destroy() {
+    this.invalidateCache();
+    this.dailyWarnings.clear();
+    console.log('💰 ExpenseManager destroyed');
   }
 }
 

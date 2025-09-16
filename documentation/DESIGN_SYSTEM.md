@@ -258,9 +258,9 @@ setupRupiahFormatting(inputElement) {
 ```css
 /* Base Skeleton Loader */
 .skeleton-loader {
-  background: linear-gradient(90deg, 
-    rgba(33, 38, 45, 0.8) 0%, 
-    rgba(33, 38, 45, 0.9) 50%, 
+  background: linear-gradient(90deg,
+    rgba(33, 38, 45, 0.8) 0%,
+    rgba(33, 38, 45, 0.9) 50%,
     rgba(33, 38, 45, 0.8) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
@@ -279,6 +279,33 @@ setupRupiahFormatting(inputElement) {
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+/* Card Shimmer Effect */
+.reset-date-preview, .budget-summary {
+  position: relative;
+  overflow: hidden;
+}
+
+.reset-date-preview::before, .budget-summary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.05),
+    transparent
+  );
+  animation: shimmerCard 4s infinite linear;
+}
+
+@keyframes shimmerCard {
+  0% { left: -100%; }
+  100% { left: 100%; }
 }
 
 /* Accordion Skeleton Specific */
@@ -308,11 +335,26 @@ setupRupiahFormatting(inputElement) {
 - Use opacity to soften the loading state
 - Animate background position for shimmer effect
 
+#### **Card Shimmer Effect Guidelines**
+- Implemented using `::before` pseudo-element
+- Supports `.reset-date-preview` and `.budget-summary` classes
+- Animation duration set to 4 seconds for subtle, continuous movement
+- Requires `position: relative` and `overflow: hidden` on parent container
+- Uses a linear gradient with transparent edges for smooth effect
+- Animates left position to create sweeping light effect
+- Performance-optimized with minimal CSS keyframe complexity
+
 #### **Performance Considerations**
 - Use `will-change: transform` for hardware acceleration
 - Avoid complex gradients that might impact rendering
 - Respect user's reduced motion preferences
 - Optimize keyframe complexity
+
+#### **Shimmer Effect Considerations**
+- Use subtle gradients to minimize rendering complexity
+- Prefer `transform` and `opacity` for hardware-accelerated animations
+- Implement `prefers-reduced-motion` media query to disable shimmer for sensitive users
+- Limit shimmer to 2-3 key components to prevent visual fatigue
 
 ### Performance Optimization
 ```css
@@ -328,6 +370,13 @@ setupRupiahFormatting(inputElement) {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+
+  /* Disable Shimmer Effect */
+  .reset-date-preview::before,
+  .budget-summary::before {
+    content: none;
+    animation: none;
+  }
 }
 ```
 
@@ -336,6 +385,89 @@ setupRupiahFormatting(inputElement) {
 2. **Use Hardware Acceleration**: Leverage `will-change` and `translateZ`
 3. **Respect User Preferences**: Implement reduced motion
 4. **Be Purposeful**: Animations should enhance, not distract
+## Unified Card Design Patterns
+
+### Financial Intelligence Card Structure
+
+#### Design Philosophy
+- **Progressive Disclosure**: Smart information hierarchy
+- **Mobile-First Approach**: Vertical stacking on small screens
+- **Visual Hierarchy**: Clear separation between primary and secondary insights
+
+#### HTML Structure
+```html
+<div class="financial-intelligence-unified glass-card">
+  <div class="primary-insight">
+    <!-- Most important financial insight, prominent display -->
+  </div>
+  
+  <div class="insights-divider"></div>
+  
+  <div class="secondary-insights">
+    <!-- Compact, contextual insights -->
+  </div>
+  
+  <div class="metrics-section">
+    <!-- 2-column grid for additional metrics -->
+  </div>
+</div>
+```
+
+#### CSS Implementation
+```css
+.financial-intelligence-unified {
+  display: grid;
+  grid-template-areas: 
+    "primary"
+    "divider"
+    "secondary"
+    "metrics";
+  gap: 16px;
+}
+
+.primary-insight {
+  grid-area: primary;
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+}
+
+.insights-divider {
+  grid-area: divider;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.secondary-insights {
+  grid-area: secondary;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metrics-section {
+  grid-area: metrics;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .financial-intelligence-unified {
+    grid-template-columns: 1fr;
+  }
+  
+  .metrics-section {
+    grid-template-columns: 1fr;
+  }
+}
+```
+
+#### Key Design Principles
+1. **Elimination of Cognitive Load**: Remove tab-switching requirement
+2. **Instant Information Accessibility**: Primary insight always visible
+3. **Responsive Layout**: Adapts seamlessly across devices
+4. **Visual Separation**: Clear hierarchy through dividers and layout
+
 ## Input System
 
 ### Base Glass Input

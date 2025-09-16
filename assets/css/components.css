@@ -116,15 +116,23 @@
 }
 
 .dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-lg);
+  text-align: left;
+  margin-bottom: var(--spacing-xl);
 }
 
 .dashboard-header h2 {
   margin: 0;
   color: var(--text-primary);
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+}
+
+/* Month Filter Section */
+.dashboard-month-filter-section {
+  margin-bottom: var(--spacing-lg);
+  display: flex;
+  justify-content: center;
 }
 
 /* ===== GLASSMORPHISM DROPDOWN STYLING ===== */
@@ -388,14 +396,27 @@ select.glass-input.error-state:focus {
 }
 
 /* Category Breakdown */
-.category-breakdown h3 {
-  text-align: center;
+.category-breakdown .category-header {
   margin-bottom: var(--spacing-lg);
-  color: var(--neon-amber);
 }
 
-.chart-container,
-.category-accordion {
+.category-breakdown h3 {
+  text-align: left;
+  margin: 0;
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+.category-breakdown .category-subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+
+.chart-container {
   min-height: 200px;
   background: var(--bg-glass-light);
   border-radius: var(--radius-md);
@@ -405,6 +426,10 @@ select.glass-input.error-state:focus {
 .category-accordion {
   height: auto;
   padding: 0;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0;
+  min-height: auto;
 }
 
 /* Recent Expenses */
@@ -712,7 +737,25 @@ select.glass-input.error-state:focus {
 }
 
 .budget-setup-card {
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Ensure proper spacing between separate cards */
+.budget-setup-card + .budget-setup-card {
+  margin-top: var(--spacing-md);
+}
+
+/* Complete Setup Button - Outside of cards */
+.onboarding-actions {
+  margin-top: var(--spacing-lg);
+  text-align: center;
+}
+
+.onboarding-actions .btn-large {
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  min-width: 200px;
 }
 
 .budget-setup-card h2 {
@@ -1508,6 +1551,8 @@ select.glass-input.error-state:focus {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  position: relative;
+  overflow: hidden;
 }
 
 .budget-total {
@@ -1558,10 +1603,13 @@ select.glass-input.error-state:focus {
 /* Responsive Components */
 @media (max-width: 480px) {
   .dashboard-header {
-    flex-direction: column;
-    gap: var(--spacing-md);
-    align-items: stretch;
+    text-align: left;
   }
+  
+  .dashboard-header h2 {
+    text-align: left;
+  }
+}
   
   .budget-summary {
     gap: var(--spacing-sm);
@@ -2087,15 +2135,15 @@ select.glass-input.error-state:focus {
 }
 
 .category-breakdown-item {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.03) !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   padding: var(--spacing-md);
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
 .category-breakdown-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(184, 134, 11, 0.2);
 }
 
@@ -2133,12 +2181,15 @@ select.glass-input.error-state:focus {
 }
 
 .category-spent {
-  font-weight: 600;
   color: var(--text-primary);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
 }
 
 .category-budget {
   color: var(--text-secondary);
+  font-weight: 500;
+  font-size: var(--font-size-sm);
 }
 
 .category-progress-bar {
@@ -2813,6 +2864,217 @@ select.glass-input.expense-category-dropdown:focus {
 }
 
 /* ========================================
+   📅 BUDGET RESET DATE STYLING
+   Reset date selection interface
+   ======================================== */
+
+/* Reset Date Options Container */
+.reset-date-options {
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Preset Buttons Container */
+.reset-date-preset-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+/* Individual Preset Button */
+.reset-date-preset-btn {
+  background: var(--bg-glass);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md) var(--spacing-sm);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.reset-date-preset-btn:hover {
+  background: var(--hover-color);
+  border-color: rgba(184, 134, 11, 0.4);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.reset-date-preset-btn.selected {
+  background: linear-gradient(135deg, rgba(184, 134, 11, 0.2), rgba(184, 134, 11, 0.1));
+  border-color: var(--neon-gold);
+  box-shadow: 0 0 20px rgba(184, 134, 11, 0.3);
+}
+
+.reset-date-preset-btn.selected::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  pointer-events: none;
+}
+
+/* Preset Button Labels */
+.preset-label {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.preset-desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  line-height: 1.2;
+}
+
+.reset-date-preset-btn.selected .preset-label {
+  color: var(--neon-gold);
+}
+
+.reset-date-preset-btn.selected .preset-desc {
+  color: var(--text-secondary);
+}
+
+/* Custom Button Styling */
+.reset-date-preset-btn.custom-btn {
+  border-style: dashed;
+}
+
+.reset-date-preset-btn.custom-btn:hover {
+  border-style: solid;
+}
+
+/* Custom Date Selector */
+.reset-date-custom {
+  padding: var(--spacing-md);
+  background: var(--bg-glass-light);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+  animation: slideDown 0.3s ease;
+}
+
+.reset-date-custom label {
+  display: block;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  margin-bottom: var(--spacing-xs);
+}
+
+.reset-date-custom select {
+  width: 100%;
+  max-width: 200px;
+}
+
+/* Period Preview - Compact Design - Matching Monthly Budget Style */
+.reset-date-preview {
+  background: var(--bg-glass-light);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  position: relative;
+  overflow: hidden;
+  min-height: 88px; /* Match budget-summary height */
+}
+
+.reset-date-preview::before,
+.budget-summary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: shimmer 4s infinite;
+}
+
+.preview-icon {
+  display: none; /* Hide icon in column layout */
+}
+
+.preview-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-text strong {
+  display: inline;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  margin-right: var(--spacing-xs);
+}
+
+#previewPeriodText {
+  color: var(--neon-gold);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Animations */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .reset-date-preset-buttons {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-xs);
+  }
+
+  .reset-date-preset-btn {
+    padding: var(--spacing-sm);
+  }
+
+  .preset-label {
+    font-size: var(--font-size-sm);
+  }
+
+  .preset-desc {
+    font-size: var(--font-size-xs);
+  }
+
+  .reset-date-preview {
+    padding: var(--spacing-md);
+    min-height: 72px; /* Slightly smaller on mobile but still matching proportion */
+  }
+
+  #previewPeriodText {
+    font-size: var(--font-size-base);
+  }
+}
+
+/* ========================================
    📅 DATE PICKER STYLING - GOLDEN THEME
    Enhanced date picker with glassmorphism
    ======================================== */
@@ -3234,32 +3496,32 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
 }
 
 /* Budget Health Indicators */
+/* Level 2 - Category Items - Matching dashboard-optimized.css .metric-item */
 .category-breakdown-item {
-  padding: var(--spacing-md);
-  border-radius: var(--radius-md);
-  background: var(--bg-glass-light);
+  padding: var(--card-padding);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03) !important;
   border: 1px solid var(--border-color);
   margin-bottom: var(--spacing-sm);
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
   position: relative;
 }
 
 .category-breakdown-item:hover {
-  background: var(--hover-color);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.06) !important;
+  transform: translateY(-1px);
 }
 
 .category-breakdown-item.budget-safe {
-  border-left: 4px solid #22c55e;
+  border-left: 2px solid #22c55e;
 }
 
 .category-breakdown-item.budget-warning {
-  border-left: 4px solid #f59e0b;
+  border-left: 2px solid #f59e0b;
 }
 
 .category-breakdown-item.budget-danger {
-  border-left: 4px solid #ef4444;
+  border-left: 2px solid #ef4444;
 }
 
 .category-info {
@@ -3835,17 +4097,17 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  background: rgba(255, 255, 255, 0.05);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.02);
   border-radius: var(--border-radius);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
+  border-left: 2px solid rgba(184, 134, 11, 0.4);
+  transition: all 0.2s ease;
+  min-height: 60px;
 }
 
 .stat-mini:hover {
-  background: rgba(184, 134, 11, 0.08);
-  border-color: rgba(184, 134, 11, 0.2);
-  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.04);
+  border-left-color: rgba(184, 134, 11, 0.6);
 }
 
 .stat-icon {
@@ -3886,15 +4148,14 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--spacing-md);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
 }
 
 .intelligence-header h3 {
   margin: 0;
   font-size: var(--font-size-lg);
   color: var(--text-primary);
+  font-weight: 600;
 }
 
 .intelligence-tabs {
@@ -4025,6 +4286,331 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
   color: #EF4444;
 }
 
+/* ========================================
+   Unified Financial Intelligence Design
+======================================== */
+
+/* Main unified container */
+.intelligence-unified-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-sm);
+}
+
+/* Section Labels */
+.section-label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-sm);
+  opacity: 0.8;
+}
+
+/* Visual Separator */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    rgba(184, 134, 11, 0.3) 50%,
+    transparent 100%);
+  margin: var(--spacing-xs) 0;
+  position: relative;
+}
+
+.section-divider::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 3px;
+  background: var(--neon-amber);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(184, 134, 11, 0.4);
+}
+
+/* Insights Section */
+.insights-section {
+  flex: 1;
+  min-height: 120px;
+}
+
+.insights-unified-grid {
+  display: grid;
+  gap: var(--spacing-sm);
+  grid-template-areas: 
+    "primary primary"
+    "secondary1 secondary2";
+  grid-template-rows: auto auto;
+}
+
+/* Enhanced insight styling with hierarchy */
+.insight-item {
+  padding: var(--spacing-md);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--border-radius);
+  border-left: 3px solid var(--neon-amber);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Primary insight - prominent placement */
+.insight-item.primary {
+  grid-area: primary;
+  background: linear-gradient(135deg, 
+    rgba(184, 134, 11, 0.08) 0%, 
+    rgba(184, 134, 11, 0.03) 100%);
+  border-left: 4px solid var(--neon-amber);
+  padding: var(--spacing-lg);
+}
+
+/* Secondary insights - compact side placement */
+.insight-item.secondary {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.95em;
+}
+
+.insight-item:nth-child(2) { grid-area: secondary1; }
+.insight-item:nth-child(3) { grid-area: secondary2; }
+
+/* Hover effects */
+.insight-item:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(184, 134, 11, 0.1);
+}
+
+.insight-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, var(--neon-amber) 0%, transparent 70%);
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.insight-item.clicked::before {
+  opacity: 0.05;
+  transform: scale(1);
+}
+
+/* Insight content styling */
+.insight-title {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.insight-description {
+  font-size: 0.95em;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+  opacity: 0.9;
+}
+
+.insight-action {
+  font-size: 0.85em;
+  font-weight: 500;
+  color: var(--neon-amber);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.insight-action:hover {
+  border-bottom-color: var(--neon-amber);
+  opacity: 0.8;
+}
+
+/* Color variants for insights */
+.insight-item.success {
+  border-left-color: #10b981;
+}
+
+.insight-item.success .insight-title {
+  color: #10b981;
+}
+
+.insight-item.warning {
+  border-left-color: #f59e0b;
+}
+
+.insight-item.warning .insight-title {
+  color: #f59e0b;
+}
+
+.insight-item.danger {
+  border-left-color: #ef4444;
+}
+
+.insight-item.danger .insight-title {
+  color: #ef4444;
+}
+
+.insight-item.info {
+  border-left-color: #3b82f6;
+}
+
+.insight-item.info .insight-title {
+  color: #3b82f6;
+}
+
+/* Metrics Section */
+.metrics-section {
+  flex: 0 0 auto;
+}
+
+.metrics-unified-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-sm);
+}
+
+/* Enhanced metric items */
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--border-radius);
+  border-left: 2px solid rgba(184, 134, 11, 0.4);
+  transition: all 0.2s ease;
+  min-height: 60px;
+}
+
+.metric-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-1px);
+}
+
+.metric-icon {
+  font-size: 1.1em;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(184, 134, 11, 0.1);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.metric-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.metric-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.metric-value {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Metric value color variants */
+.metric-value.success {
+  color: #10b981;
+}
+
+.metric-value.warning {
+  color: #f59e0b;
+}
+
+.metric-value.danger {
+  color: #ef4444;
+}
+
+/* Staggered animations */
+.insight-item,
+.metric-item {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideInUp 0.5s ease forwards;
+}
+
+.insight-item:nth-child(1) { animation-delay: 0.1s; }
+.insight-item:nth-child(2) { animation-delay: 0.2s; }
+.insight-item:nth-child(3) { animation-delay: 0.3s; }
+
+.metric-item:nth-child(1) { animation-delay: 0.4s; }
+.metric-item:nth-child(2) { animation-delay: 0.45s; }
+.metric-item:nth-child(3) { animation-delay: 0.5s; }
+.metric-item:nth-child(4) { animation-delay: 0.55s; }
+
+@keyframes slideInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 480px) {
+  .intelligence-unified-content {
+    gap: var(--spacing-md);
+  }
+  
+  /* Stack insights vertically on mobile */
+  .insights-unified-grid {
+    grid-template-areas: 
+      "primary"
+      "secondary1" 
+      "secondary2";
+    grid-template-columns: 1fr;
+    gap: var(--spacing-xs);
+  }
+  
+  .insight-item.primary {
+    padding: var(--spacing-md);
+  }
+  
+  .insight-item.secondary {
+    padding: var(--spacing-sm);
+  }
+  
+  /* Keep metrics in 2 columns on mobile - they're compact */
+  .metrics-unified-grid {
+    gap: var(--spacing-xs);
+  }
+  
+  .metric-item {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    min-height: 50px;
+  }
+  
+  .metric-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 1em;
+  }
+}
+
 /* Collapsible Mobile Content */
 .collapsible-mobile {
   transition: all 0.3s ease;
@@ -4048,7 +4634,6 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
   .dashboard-container {
     padding: var(--spacing-lg);
     max-width: 1200px;
-    margin: 0 auto;
   }
   
   .dashboard-main-grid {
@@ -4206,8 +4791,8 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
 }
 
 /* ========================================
-   CATEGORY ACCORDION STYLING
-   Enhanced interactive category breakdown
+   CATEGORY CARDS STYLING
+   Visual category breakdown with progress bars
    ======================================== */
 
 /* Accordion Container */
@@ -4216,18 +4801,76 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
   margin: 0;
 }
 
-/* Accordion Items */
+/* Accordion Items with Shimmer Effect */
 .category-accordion-item {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.03) !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   margin-bottom: var(--spacing-sm);
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+/* Category Cards Shimmer Effect - Applied to all cards */
+.category-accordion-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.04),
+    transparent
+  );
+  animation: categoryShimmer 6s infinite linear;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Enhanced shimmer for active cards */
+.category-accordion-item.active::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(184, 134, 11, 0.06),
+    transparent
+  );
+  animation: categoryShimmerActive 5s infinite linear;
+}
+
+@keyframes categoryShimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+@keyframes categoryShimmerActive {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* Disable shimmer for reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .category-accordion-item::before,
+  .category-accordion-item.active::before {
+    animation: none;
+    background: none;
+  }
+}
+
+/* Disable shimmer on mobile for better performance */
+@media (max-width: 768px) {
+  .category-accordion-item::before,
+  .category-accordion-item.active::before {
+    animation-duration: 8s; /* Slower on mobile */
+  }
 }
 
 .category-accordion-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(184, 134, 11, 0.2);
   transform: translateY(-2px);
 }
@@ -4246,6 +4889,7 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  z-index: 2; /* Ensure content appears above shimmer */
 }
 
 .category-header:hover {
@@ -4302,12 +4946,21 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
   filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.3));
 }
 
+/* Updated amounts row for left-right alignment */
+.category-amounts-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 var(--spacing-md) var(--spacing-sm);
+  position: relative;
+  z-index: 2; /* Ensure content appears above shimmer */
+}
+
 /* Category Amounts */
 .category-amounts {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  margin: 0 var(--spacing-md);
 }
 
 .category-spent {
@@ -4325,7 +4978,6 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
 .category-percentage {
   font-weight: 700;
   font-size: var(--font-size-base);
-  margin: 0 var(--spacing-md);
   min-width: 48px;
   text-align: right;
 }
@@ -4342,19 +4994,255 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
   color: #ef4444;
 }
 
-/* Accordion Arrow */
-.accordion-arrow {
-  font-size: 1rem;
-  color: var(--text-secondary);
-  margin-left: var(--spacing-sm);
-  transition: transform 0.3s ease;
-  user-select: none;
+/* Enhanced progress bar container with percentage label */
+.category-progress-container {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin: 0 var(--spacing-md) var(--spacing-md);
+  position: relative;
+  z-index: 2; /* Ensure content appears above shimmer */
 }
 
-.category-accordion-item.active .accordion-arrow {
-  transform: rotate(180deg);
-  color: var(--neon-gold);
+.category-progress-bg {
+  height: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+  position: relative;
+  flex: 1;
 }
+
+.category-percentage.healthy {
+  color: var(--success-color);
+}
+
+.category-percentage.warning {
+  color: var(--warning-color);
+}
+
+.category-percentage.danger {
+  color: var(--error-color);
+}
+
+/* Progress Bar */
+.category-progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 var(--spacing-md) var(--spacing-md);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.category-progress-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: progressGrow 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced progress fill with state-based colors and glow */
+.category-progress-fill.healthy {
+  background: linear-gradient(90deg, #00D26A, #00B86B);
+  box-shadow: 0 0 8px rgba(0, 210, 106, 0.4);
+}
+
+.category-progress-fill.warning {
+  background: linear-gradient(90deg, #FFB800, #FF8F00);
+  box-shadow: 0 0 8px rgba(255, 184, 0, 0.4);
+}
+
+.category-progress-fill.danger {
+  background: linear-gradient(90deg, #FF5B5B, #FF3030);
+  box-shadow: 0 0 8px rgba(255, 91, 91, 0.4);
+}
+
+@keyframes progressGrow {
+  from {
+    width: 0%;
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Category Content (Expandable) */
+.category-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(255, 255, 255, 0.02);
+  position: relative;
+  z-index: 2; /* Ensure content appears above shimmer */
+}
+
+.category-content.expanded {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Level 2.5 - Expandable Container (Simple container) */
+.category-expenses {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Skeleton Loading for Category Expenses */
+.category-loading {
+  padding: var(--spacing-md);
+  text-align: center;
+}
+
+.loading-text {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.expense-skeleton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--spacing-md);
+  margin-bottom: 8px;
+}
+
+.expense-skeleton-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.expense-skeleton-description {
+  width: 120px;
+  height: 14px;
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.1) 25%, 
+    rgba(255, 255, 255, 0.15) 50%, 
+    rgba(255, 255, 255, 0.1) 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+.expense-skeleton-date {
+  width: 80px;
+  height: 12px;
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.08) 25%, 
+    rgba(255, 255, 255, 0.12) 50%, 
+    rgba(255, 255, 255, 0.08) 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+.expense-skeleton-amount {
+  width: 70px;
+  height: 14px;
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.1) 25%, 
+    rgba(255, 255, 255, 0.15) 50%, 
+    rgba(255, 255, 255, 0.1) 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Expense Cards - More Compact */
+/* Level 3 - Expense Items (.stat-mini style from Budget Status) */
+.expense-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+  transition: all var(--transition-fast);
+  min-height: 44px;
+}
+
+.expense-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.expense-card:last-child {
+  margin-bottom: 0;
+}
+
+/* Level 3 - Expense Info Structure (Budget Status style) */
+.expense-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.expense-date-amount {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+/* Level 3 - Typography (.stat-mini style) */
+.category-expenses .expense-card .expense-date {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.category-expenses .expense-card .expense-amount {
+  font-size: var(--font-size-sm);
+  color: var(--neon-gold);
+  font-weight: 600;
+}
+
+.category-expenses .expense-card .expense-description {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* Empty State */
+.category-empty-expenses, 
+.no-expenses {
+  text-align: center;
+  padding: var(--spacing-lg);
+  color: var(--text-secondary);
+}
+
+.empty-expense-icon {
+  font-size: 2rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.empty-expense-subtitle {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
 
 /* Category Content (Collapsible) */
 .category-content {
@@ -4623,5 +5511,44 @@ input[type="date"].glass-input::-moz-calendar-picker-indicator {
     position: absolute;
     top: var(--spacing-sm);
     right: var(--spacing-sm);
+  }
+}
+
+/* ========================================
+   Budget Status Card - Simplified (Non-expandable)
+   ======================================== */
+
+/* Budget Core Section (Always Visible) */
+.budget-core-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+/* Essential stats in core section */
+.budget-essential-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+}
+
+/* ========================================
+   Financial Intelligence - Unified Metrics Grid
+   ======================================== */
+
+/* Unified metrics grid layout - compact 2x3 or 3x2 depending on screen */
+.metrics-unified-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+}
+
+/* Responsive adjustments for unified metrics */
+@media (max-width: 480px) {
+  .metrics-unified-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
   }
 }

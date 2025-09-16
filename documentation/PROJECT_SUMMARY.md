@@ -27,6 +27,7 @@
 | **[ERROR_HANDLING_PATTERNS.md](ERROR_HANDLING_PATTERNS.md)** | 3-layer error system patterns | ~400 | ✅ Reusable |
 | **[DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)** | UI components, styling guidelines | ~600 | ✅ Complete |
 | **[ONBOARDING_COMPLETE.md](ONBOARDING_COMPLETE.md)** | Production onboarding system | ~500 | ✅ Complete |
+| **[CATEGORY_SERVICE.md](CATEGORY_SERVICE.md)** | Unified emoji mapping system | ~800 | ✅ Complete |
 
 ---
 
@@ -37,6 +38,7 @@
 - Current achievements and status → **[PROJECT_STATUS.md](PROJECT_STATUS.md)**
 - Complete onboarding system → **[ONBOARDING_COMPLETE.md](ONBOARDING_COMPLETE.md)**
 - UI/UX design patterns → **[DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)**
+- Category icon mapping → **[CATEGORY_SERVICE.md](CATEGORY_SERVICE.md)**
 
 ### **💻 For Development Planning:**
 - Feature pipeline and timeline → **[PROJECT_ROADMAP.md](PROJECT_ROADMAP.md)**
