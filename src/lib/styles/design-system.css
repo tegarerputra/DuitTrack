@@ -1,0 +1,326 @@
+/*
+ * DuitTrack Design System
+ * Unified CSS variables and components for consistent styling
+ * Version: 2.0.0
+ */
+
+/* ===== GLASS MORPHISM SYSTEM ===== */
+:root {
+  /* Glass Effect Core Variables */
+  --glass-bg-primary: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(6, 182, 212, 0.08) 100%);
+
+  --glass-bg-secondary: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(8, 145, 178, 0.06) 100%);
+
+  --glass-bg-hero: linear-gradient(135deg,
+    rgba(6, 182, 212, 0.15) 0%,
+    rgba(255, 255, 255, 0.1) 30%,
+    rgba(8, 145, 178, 0.12) 70%,
+    rgba(6, 182, 212, 0.08) 100%);
+
+  /* Backdrop Filter Effects */
+  --glass-blur-sm: blur(20px) saturate(1.5);
+  --glass-blur-md: blur(25px) saturate(1.8);
+  --glass-blur-lg: blur(30px) saturate(2);
+  --glass-blur-xl: blur(35px) saturate(2.2);
+
+  /* Glass Borders */
+  --glass-border-light: 1px solid rgba(255, 255, 255, 0.2);
+  --glass-border-medium: 1px solid rgba(255, 255, 255, 0.3);
+  --glass-border-strong: 1px solid rgba(255, 255, 255, 0.4);
+
+  /* Glass Shadows */
+  --glass-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+
+  --glass-shadow-md: 0 8px 32px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+
+  --glass-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+
+  --glass-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+
+  /* Border Radius System */
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+
+  /* Spacing System */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* Animation Variables */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Fintech Colors (Enhanced) */
+  --fintech-primary: #2563eb;
+  --fintech-primary-hover: #1d4ed8;
+  --fintech-success: #10b981;
+  --fintech-warning: #f59e0b;
+  --fintech-danger: #ef4444;
+}
+
+/* ===== UNIVERSAL GLASS COMPONENTS ===== */
+
+/* Base Glass Card - Single Source of Truth */
+.glass-card {
+  position: relative;
+  background: var(--glass-bg-primary);
+  backdrop-filter: var(--glass-blur-md);
+  border: var(--glass-border-medium);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow-md);
+  transition: all var(--transition-normal);
+}
+
+.glass-card:hover {
+  backdrop-filter: var(--glass-blur-lg);
+  box-shadow: var(--glass-shadow-lg);
+  border: var(--glass-border-strong);
+  transform: translateY(-2px);
+}
+
+/* Glass Card Variants */
+.glass-card-sm {
+  border-radius: var(--radius-sm);
+  backdrop-filter: var(--glass-blur-sm);
+  box-shadow: var(--glass-shadow-sm);
+}
+
+.glass-card-lg {
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--glass-blur-lg);
+  box-shadow: var(--glass-shadow-lg);
+}
+
+.glass-card-xl {
+  border-radius: var(--radius-xl);
+  backdrop-filter: var(--glass-blur-xl);
+  box-shadow: var(--glass-shadow-xl);
+}
+
+/* Hero Glass Card */
+.glass-card-hero {
+  background: var(--glass-bg-hero);
+  backdrop-filter: var(--glass-blur-xl);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--glass-shadow-xl);
+}
+
+.glass-card-hero:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 60px rgba(6, 182, 212, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Interactive Glass Cards */
+.glass-card-interactive {
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.glass-card-interactive:hover {
+  transform: translateY(-3px);
+  backdrop-filter: var(--glass-blur-lg);
+  box-shadow: var(--glass-shadow-xl);
+}
+
+.glass-card-interactive:active {
+  transform: translateY(-1px);
+  transition: all var(--transition-fast);
+}
+
+/* Status Variants */
+.glass-card-success {
+  background: linear-gradient(135deg,
+    rgba(16, 185, 129, 0.15) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(16, 185, 129, 0.08) 100%);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.glass-card-warning {
+  background: linear-gradient(135deg,
+    rgba(245, 158, 11, 0.15) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(245, 158, 11, 0.08) 100%);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.glass-card-danger {
+  background: linear-gradient(135deg,
+    rgba(239, 68, 68, 0.15) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(239, 68, 68, 0.08) 100%);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* ===== PADDING SYSTEM ===== */
+.glass-card-p-sm { padding: var(--space-sm); }
+.glass-card-p-md { padding: var(--space-md); }
+.glass-card-p-lg { padding: var(--space-lg); }
+.glass-card-p-xl { padding: var(--space-xl); }
+
+/* ===== GLASS BUTTONS ===== */
+.glass-button {
+  position: relative;
+  background: var(--glass-bg-secondary);
+  backdrop-filter: var(--glass-blur-sm);
+  border: var(--glass-border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow-sm);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.glass-button:hover {
+  backdrop-filter: var(--glass-blur-md);
+  box-shadow: var(--glass-shadow-md);
+  transform: translateY(-1px);
+}
+
+.glass-button:active {
+  transform: translateY(0);
+  box-shadow: var(--glass-shadow-sm);
+}
+
+/* ===== RESPONSIVE ADJUSTMENTS ===== */
+@media (max-width: 768px) {
+  :root {
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+  }
+
+  .glass-card:hover {
+    transform: translateY(-1px);
+  }
+
+  .glass-card-interactive:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* ===== ACCESSIBILITY ===== */
+@media (prefers-reduced-motion: reduce) {
+  .glass-card,
+  .glass-button {
+    transition: none;
+  }
+
+  .glass-card:hover,
+  .glass-card-interactive:hover {
+    transform: none;
+  }
+}
+
+/* ===== HIGH CONTRAST MODE ===== */
+@media (prefers-contrast: high) {
+  .glass-card {
+    border: 2px solid var(--fintech-primary);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: none;
+  }
+}
+
+/* ===== UTILITY CLASSES ===== */
+.glass-text-shadow {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.glass-backdrop {
+  backdrop-filter: var(--glass-blur-md);
+}
+
+/* ===== LEGACY COMPATIBILITY ===== */
+/* Match exact styling with dashboard glass cards */
+.fintech-card {
+  position: relative;
+  border-radius: 8px;
+  padding: 16px;
+  overflow: hidden;
+  backdrop-filter: blur(25px) saturate(1.8);
+  -webkit-backdrop-filter: blur(25px) saturate(1.8);
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(6, 182, 212, 0.08) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fintech-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow:
+    0 25px 60px rgba(6, 182, 212, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  border-color: rgba(6, 182, 212, 0.4);
+  backdrop-filter: blur(30px) saturate(2);
+  -webkit-backdrop-filter: blur(30px) saturate(2);
+}
+
+.fintech-card-interactive {
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.fintech-card-interactive:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow:
+    0 25px 60px rgba(6, 182, 212, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  border-color: rgba(6, 182, 212, 0.4);
+  backdrop-filter: blur(30px) saturate(2);
+  -webkit-backdrop-filter: blur(30px) saturate(2);
+}
+
+.fintech-card-interactive:active {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow:
+    0 12px 32px rgba(6, 182, 212, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  border-color: rgba(6, 182, 212, 0.3);
+  backdrop-filter: blur(25px) saturate(1.8);
+  -webkit-backdrop-filter: blur(25px) saturate(1.8);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fintech-card-sm {
+  border-radius: var(--radius-sm);
+  backdrop-filter: var(--glass-blur-sm);
+  box-shadow: var(--glass-shadow-sm);
+  padding: var(--space-sm);
+}
+
+.fintech-card-lg {
+  border-radius: var(--radius-lg);
+  backdrop-filter: var(--glass-blur-lg);
+  box-shadow: var(--glass-shadow-lg);
+  padding: var(--space-lg);
+}
+
+.fintech-card-xl {
+  border-radius: var(--radius-xl);
+  backdrop-filter: var(--glass-blur-xl);
+  box-shadow: var(--glass-shadow-xl);
+  padding: var(--space-xl);
+}

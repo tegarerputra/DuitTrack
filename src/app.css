@@ -1,0 +1,375 @@
+/* DuitTrack Global Styles - Fintech Design System */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Unified Design System - Single Source of Truth */
+@import './lib/styles/liquid-glass.css';
+@import './lib/styles/design-system.css';
+@import './lib/styles/fintech-design.css';
+
+/* Custom CSS Variables for Dynamic Theming */
+:root {
+  /* Light theme colors */
+  --color-bg-primary: #f8fafc;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #f1f5f9;
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #64748b;
+  --color-text-tertiary: #94a3b8;
+  --color-border-primary: #e2e8f0;
+  --color-border-secondary: #cbd5e1;
+  --color-glass-bg: rgba(255, 255, 255, 0.25);
+  --color-glass-border: rgba(255, 255, 255, 0.18);
+  --color-glass-shadow: rgba(31, 38, 135, 0.37);
+
+  /* Indonesian Rupiah specific colors */
+  --color-currency-positive: #22c55e;
+  --color-currency-negative: #ef4444;
+  --color-currency-neutral: #64748b;
+
+  /* Financial status colors */
+  --color-budget-safe: #22c55e;
+  --color-budget-warning: #f59e0b;
+  --color-budget-danger: #ef4444;
+  --color-budget-over: #dc2626;
+
+  /* Animation settings */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  --transition-bounce: 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* Glassmorphism settings */
+  --glass-blur: blur(10px);
+  --glass-blur-strong: blur(15px);
+  --glass-blur-subtle: blur(8px);
+}
+
+/* Dark theme colors */
+[data-theme="dark"] {
+  --color-bg-primary: #0f172a;
+  --color-bg-secondary: #1e293b;
+  --color-bg-tertiary: #334155;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-tertiary: #94a3b8;
+  --color-border-primary: #334155;
+  --color-border-secondary: #475569;
+  --color-glass-bg: rgba(255, 255, 255, 0.1);
+  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-glass-shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* Base styles with Indonesian localization support */
+html {
+  font-family: 'Inter', system-ui, sans-serif;
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  @apply antialiased;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  color: var(--color-text-primary);
+  overflow-x: hidden;
+}
+
+/* Indonesian number formatting support */
+.currency-idr {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.025em;
+}
+
+/* Glassmorphism components */
+.glass-card {
+  background: var(--color-glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--color-glass-border);
+  border-radius: 1rem;
+  box-shadow: 0 8px 32px 0 var(--color-glass-shadow);
+  transition: all var(--transition-normal);
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.glass-button {
+  @apply glass-card px-6 py-3 font-medium text-white;
+  background: rgba(102, 126, 234, 0.6);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.glass-button:hover {
+  background: rgba(102, 126, 234, 0.8);
+  transform: translateY(-1px);
+}
+
+.glass-button:active {
+  transform: translateY(0);
+}
+
+.glass-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Fintech specific components */
+.currency-display {
+  @apply font-mono text-lg font-semibold currency-idr;
+}
+
+.currency-positive {
+  color: var(--color-currency-positive);
+}
+
+.currency-negative {
+  color: var(--color-currency-negative);
+}
+
+.currency-neutral {
+  color: var(--color-currency-neutral);
+}
+
+.budget-status-safe {
+  @apply bg-green-100 text-green-800 border-green-200;
+}
+
+.budget-status-warning {
+  @apply bg-yellow-100 text-yellow-800 border-yellow-200;
+}
+
+.budget-status-danger {
+  @apply bg-red-100 text-red-800 border-red-200;
+}
+
+/* Mobile-optimized components for Indonesian market */
+@media (max-width: 430px) {
+  .mobile-card {
+    @apply mx-4 rounded-lg;
+    margin-left: 1rem;
+    margin-right: 1rem;
+  }
+
+  .mobile-safe-area {
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Focus states for accessibility */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-white;
+}
+
+[data-theme="dark"] .focus-ring {
+  @apply focus:ring-offset-gray-900;
+}
+
+/* Loading states */
+.loading-skeleton {
+  @apply animate-pulse bg-gray-200 rounded;
+}
+
+[data-theme="dark"] .loading-skeleton {
+  @apply bg-gray-700;
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+  content: '';
+}
+
+/* Animation utilities */
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-bounce-soft {
+  animation: bounceSoft 0.6s ease-out;
+}
+
+/* Chart styles for financial data */
+.chart-container {
+  @apply relative w-full;
+  min-height: 300px;
+}
+
+.chart-legend {
+  @apply flex flex-wrap gap-4 justify-center mt-4;
+}
+
+.chart-legend-item {
+  @apply flex items-center gap-2 text-sm;
+}
+
+.chart-legend-color {
+  @apply w-3 h-3 rounded-full flex-shrink-0;
+}
+
+/* Form styles */
+.form-input {
+  @apply w-full px-4 py-3 rounded-lg border border-gray-200
+         bg-white/80 backdrop-blur-sm
+         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+         placeholder-gray-400 transition-all;
+}
+
+[data-theme="dark"] .form-input {
+  @apply border-gray-600 bg-gray-800/80 text-white placeholder-gray-500;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700 mb-2;
+}
+
+[data-theme="dark"] .form-label {
+  @apply text-gray-300;
+}
+
+.form-error {
+  @apply text-red-600 text-sm mt-1;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
+}
+
+/* Indonesian rupiah formatting */
+.rupiah {
+  font-feature-settings: 'tnum';
+}
+
+.rupiah::before {
+  content: 'Rp ';
+  @apply text-gray-500;
+}
+
+/* Status indicators */
+.status-dot {
+  @apply w-2 h-2 rounded-full flex-shrink-0;
+}
+
+.status-online {
+  @apply bg-green-500;
+}
+
+.status-offline {
+  @apply bg-red-500;
+}
+
+.status-syncing {
+  @apply bg-yellow-500 animate-pulse;
+}
+
+/* PWA specific styles */
+.pwa-install-prompt {
+  @apply fixed bottom-4 left-4 right-4 z-50
+         bg-white border border-gray-200 rounded-lg shadow-lg p-4
+         animate-slide-up;
+}
+
+[data-theme="dark"] .pwa-install-prompt {
+  @apply bg-gray-800 border-gray-700;
+}
+
+/* Print styles for financial reports */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-break {
+    page-break-after: always;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .glass-card {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .glass-card {
+    border-width: 2px;
+  }
+
+  .form-input {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .shimmer::after {
+    animation: none;
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "files": [
+    {
+      "path": "dist/**/*.js",
+      "maxSize": "100kb",
+      "compression": "gzip"
+    },
+    {
+      "path": "dist/**/*.css",
+      "maxSize": "30kb",
+      "compression": "gzip"
+    },
+    {
+      "path": "dist/assets/firebase*.js",
+      "maxSize": "150kb",
+      "compression": "gzip"
+    },
+    {
+      "path": "dist/assets/charts*.js",
+      "maxSize": "80kb",
+      "compression": "gzip"
+    }
+  ],
+  "defaultCompression": "gzip"
+}

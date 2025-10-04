@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Use this agent when you need expert analysis and recommendations for financial technology products. Examples: <example>Context: User is developing a digital wallet app and wants to optimize user experience. user: 'I'm working on a payment flow for our mobile wallet. Can you analyze current market trends and suggest improvements?' assistant: 'I'll use the researcher agent to analyze payment flow trends and provide optimization recommendations.' <commentary>Since the user needs fintech product research and recommendations, use the researcher agent to provide expert analysis.</commentary></example> <example>Context: User has data about user engagement with their fintech app features. user: 'Here's our user analytics data showing feature usage patterns. What features should we prioritize next?' assistant: 'Let me use the researcher agent to analyze this data and recommend feature priorities.' <commentary>The user needs data analysis and feature recommendations for their fintech product, which requires the researcher agent.</commentary></example>
-model: sonnet
+model: inherit
 color: orange
 ---
 

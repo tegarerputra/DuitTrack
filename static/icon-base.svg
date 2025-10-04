@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#667eea" rx="80" ry="80"/>
+
+  <!-- Money icon -->
+  <g transform="translate(128, 128)">
+    <!-- Coin -->
+    <circle cx="128" cy="128" r="120" fill="#ffffff" stroke="#4a5568" stroke-width="4"/>
+
+    <!-- Dollar sign -->
+    <path d="M128 40 L128 80 M128 200 L128 240 M90 80 L166 80 Q180 80 180 95 Q180 110 166 110 L110 110 L90 80 Z M90 140 L166 140 Q180 140 180 155 Q180 170 166 170 L90 170 L90 140 Z"
+          fill="none" stroke="#4a5568" stroke-width="8" stroke-linecap="round"/>
+
+    <!-- Rupiah symbol -->
+    <text x="128" y="145" font-family="Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#4a5568">Rp</text>
+  </g>
+
+  <!-- App name -->
+  <text x="256" y="450" font-family="Arial, sans-serif" font-size="36" font-weight="bold" text-anchor="middle" fill="#ffffff">DuitTrack</text>
+</svg>

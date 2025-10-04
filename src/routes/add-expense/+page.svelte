@@ -1,0 +1,1025 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { writable, derived } from 'svelte/store';
+  import { expenseActions } from '../../lib/stores/expenses';
+  import { budgetStore, budgetActions } from '../../lib/stores/budget';
+  import { authService } from '../../lib/services/authService';
+  import { DataService } from '../../lib/services/dataService';
+  import SmartWarning from '../../lib/components/expense/SmartWarning.svelte';
+
+  // Navigation context
+  let returnPath = '';
+  let dataService: DataService | null = null;
+  let budgetData: any = null;
+  let isSubmitting = false;
+  let showSuccessState = false;
+  let dailyWarnings = new Map();
+  let categories: any[] = [];
+
+  // Form data stores
+  const formData = writable({
+    amount: '',
+    category: 'OTHER',
+    description: '',
+    date: getCurrentDate()
+  });
+
+  const errors = writable({
+    amount: '',
+    category: '',
+    description: '',
+    date: '',
+    system: ''
+  });
+
+  const smartWarning = writable({
+    show: false,
+    type: '',
+    data: {}
+  });
+
+  // Derived stores
+  const isFormValid = derived(
+    [formData, errors],
+    ([$formData, $errors]) => {
+      const amount = parseCurrencyInput($formData.amount);
+      return amount > 0 &&
+             amount <= 999999999 &&
+             $formData.date &&
+             !$errors.date &&
+             !$errors.amount;
+    }
+  );
+
+  const hasCategories = derived(
+    () => categories,
+    ($categories) => $categories && $categories.length > 0 && !$categories.every(cat => cat.disabled)
+  );
+
+  // Component initialization
+  onMount(async () => {
+    // Get return path from URL params
+    returnPath = $page.url.searchParams.get('return') || 'dashboard';
+
+    await initializeExpenseForm();
+    await loadCategories();
+  });
+
+  // Watch for form changes to trigger smart validation
+  $: if ($formData.amount && $formData.category !== 'OTHER') {
+    debounceSmartValidation();
+  }
+
+  async function initializeExpenseForm() {
+    try {
+      const user = await authService.getCurrentUser();
+      if (user) {
+        dataService = new DataService(user.uid);
+      }
+    } catch (error) {
+      console.error('Error initializing expense form:', error);
+    }
+  }
+
+  async function loadCategories() {
+    try {
+      // Subscribe to budget store to get categories
+      budgetStore.subscribe(budget => {
+        if (budget && budget.categories) {
+          categories = Object.entries(budget.categories).map(([key, data]: [string, any]) => ({
+            value: key.toUpperCase(),
+            label: formatCategoryName(key),
+            disabled: false
+          }));
+        }
+      });
+
+      // Load budget data
+      await budgetActions.loadBudgetData();
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      categories = [];
+    }
+  }
+
+  function getCurrentDate(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  function formatCurrencyInput(amount: number): string {
+    if (!amount) return '';
+    return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function parseCurrencyInput(formattedValue: string): number {
+    return parseInt(formattedValue.replace(/\./g, '') || '0', 10);
+  }
+
+  function handleAmountInput(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const value = target.value;
+
+    // Clean input: remove all non-digits
+    const cleanValue = value.replace(/[^\d]/g, '');
+
+    // Format with dots as thousand separators
+    const formattedValue = cleanValue.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+    // Update input and store
+    target.value = formattedValue;
+    formData.update(data => ({ ...data, amount: formattedValue }));
+
+    // Clear previous amount errors
+    errors.update(errs => ({ ...errs, amount: '' }));
+
+    // Validate amount
+    const amount = parseCurrencyInput(formattedValue);
+    if (amount > 999999999) {
+      errors.update(errs => ({ ...errs, amount: "Whoa there, millionaire! Max Rp 999,999,999 please!" }));
+    }
+  }
+
+  function handleCategoryChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    formData.update(data => ({ ...data, category: target.value }));
+    errors.update(errs => ({ ...errs, category: '' }));
+  }
+
+  function handleDescriptionInput(event: Event) {
+    const target = event.target as HTMLInputElement;
+    formData.update(data => ({ ...data, description: target.value }));
+    errors.update(errs => ({ ...errs, description: '' }));
+  }
+
+  function handleDateChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    formData.update(data => ({ ...data, date: target.value }));
+    errors.update(errs => ({ ...errs, date: '' }));
+
+    // Validate date
+    if (target.value) {
+      validateDateInput(target.value);
+    }
+  }
+
+  function validateDateInput(dateValue: string): boolean {
+    const date = new Date(dateValue);
+    const today = new Date();
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      errors.update(errs => ({ ...errs, date: '📅 Please enter a valid date' }));
+      return false;
+    }
+
+    // Check if date is not too far in the future (more than 1 year)
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
+    if (date > oneYearFromNow) {
+      errors.update(errs => ({ ...errs, date: '📅 Date cannot be more than 1 year in the future' }));
+      return false;
+    }
+
+    errors.update(errs => ({ ...errs, date: '' }));
+    return true;
+  }
+
+  let validationTimeout: number;
+  function debounceSmartValidation() {
+    clearTimeout(validationTimeout);
+    validationTimeout = setTimeout(() => {
+      checkSmartValidation();
+    }, 200);
+  }
+
+  async function checkSmartValidation() {
+    const data = $formData;
+    const amount = parseCurrencyInput(data.amount);
+    const category = data.category;
+
+    if (amount <= 0 || category === 'OTHER') {
+      smartWarning.set({ show: false, type: '', data: {} });
+      return;
+    }
+
+    if (!budgetData) {
+      await loadBudgetData();
+    }
+
+    if (budgetData && budgetData.categories && budgetData.categories[category.toLowerCase()]) {
+      await evaluateBudgetWarning(amount, category);
+    } else {
+      smartWarning.set({ show: false, type: '', data: {} });
+    }
+  }
+
+  async function loadBudgetData() {
+    try {
+      if (!dataService) return;
+
+      // Get from budget store
+      const currentBudget = $budgetStore;
+      if (currentBudget) {
+        budgetData = {
+          categories: currentBudget.categories
+        };
+      }
+    } catch (error) {
+      console.error('Error loading budget data:', error);
+      budgetData = null;
+    }
+  }
+
+  async function evaluateBudgetWarning(amount: number, category: string) {
+    const categoryData = budgetData.categories[category.toLowerCase()];
+    if (!categoryData) return;
+
+    const currentSpent = categoryData.spent || 0;
+    const budget = categoryData.budget || 0;
+    const newTotal = currentSpent + amount;
+    const percentage = budget > 0 ? (newTotal / budget) * 100 : 0;
+
+    // Check if we should show warning (first time per day per category+threshold)
+    const warningKey = `${category.toLowerCase()}_${Math.floor(percentage / 10) * 10}`;
+    const today = new Date().toDateString();
+    const lastWarning = dailyWarnings.get(warningKey);
+
+    if (lastWarning === today) return;
+
+    let shouldWarn = false;
+    let warningType = '';
+    let warningData = {};
+
+    if (percentage >= 100) {
+      shouldWarn = true;
+      warningType = 'exceeded';
+      warningData = {
+        category: formatCategoryName(category),
+        overage: formatCurrency(newTotal - budget),
+        newTotal: formatCurrency(newTotal),
+        budget: formatCurrency(budget),
+        percentage: Math.round(percentage)
+      };
+    } else if (percentage >= 80) {
+      shouldWarn = true;
+      warningType = 'caution';
+      warningData = {
+        category: formatCategoryName(category),
+        percentage: Math.round(percentage),
+        remaining: formatCurrency(budget - newTotal)
+      };
+    }
+
+    if (shouldWarn) {
+      smartWarning.set({
+        show: true,
+        type: warningType,
+        data: warningData
+      });
+      dailyWarnings.set(warningKey, today);
+    } else {
+      smartWarning.set({ show: false, type: '', data: {} });
+    }
+  }
+
+  async function handleSubmit(event: Event) {
+    event.preventDefault();
+
+    if (!$isFormValid || isSubmitting) return;
+
+    try {
+      isSubmitting = true;
+      errors.update(errs => ({ ...errs, system: '' }));
+
+      const data = $formData;
+      const amount = parseCurrencyInput(data.amount);
+
+      // Validate form data
+      if (!validateFormData(amount, data)) {
+        return;
+      }
+
+      const expenseData = {
+        amount,
+        category: data.category.toUpperCase(),
+        description: data.description,
+        date: data.date,
+        type: 'expense' as const,
+        periodId: getCurrentPeriodId(),
+        categoryId: data.category.toLowerCase()
+      };
+
+      let expenseId: string;
+      // Create new expense
+      if (dataService) {
+        expenseId = await dataService.createTransaction(expenseData);
+      } else {
+        expenseId = generateTempId();
+      }
+
+      // Update stores
+      await expenseActions.addExpense({ id: expenseId, ...expenseData });
+      await budgetActions.updateCategorySpending(data.category.toLowerCase(), amount);
+
+      // Show success and redirect
+      showSuccessState = true;
+      setTimeout(() => {
+        handleReturn();
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error saving expense:', error);
+      handleSubmissionError(error);
+    } finally {
+      isSubmitting = false;
+    }
+  }
+
+  function validateFormData(amount: number, data: any): boolean {
+    let hasErrors = false;
+
+    if (!amount || amount <= 0) {
+      errors.update(errs => ({ ...errs, amount: "Don't leave me empty! I need an amount!" }));
+      hasErrors = true;
+    } else if (amount > 999999999) {
+      errors.update(errs => ({ ...errs, amount: "Whoa there, millionaire! Max Rp 999,999,999 please!" }));
+      hasErrors = true;
+    }
+
+    if (!data.date) {
+      errors.update(errs => ({ ...errs, date: "Don't leave me empty! I need a date!" }));
+      hasErrors = true;
+    } else if (!validateDateInput(data.date)) {
+      hasErrors = true;
+    }
+
+    return !hasErrors;
+  }
+
+  function handleSubmissionError(error: any) {
+    if (error.code === 'permission-denied') {
+      errors.update(errs => ({ ...errs, system: 'Unable to save expense. Please try signing in again' }));
+    } else if (error.message?.includes('network')) {
+      errors.update(errs => ({ ...errs, system: 'Something went wrong saving your expense: Network error' }));
+    } else {
+      errors.update(errs => ({ ...errs, system: 'Oops! Something went wrong. Please try again!' }));
+    }
+  }
+
+  function handleReturn() {
+    // Smart return logic based on returnPath
+    switch (returnPath) {
+      case 'budget':
+        goto('/budget');
+        break;
+      case 'expenses':
+        goto('/expenses');
+        break;
+      case 'dashboard':
+      default:
+        goto('/dashboard');
+        break;
+    }
+  }
+
+  function handleCancel() {
+    handleReturn();
+  }
+
+  function formatCategoryName(category: string): string {
+    const names: Record<string, string> = {
+      'FOOD': 'Makanan',
+      'food': 'Makanan',
+      'TRANSPORT': 'Transport',
+      'transport': 'Transport',
+      'SHOPPING': 'Belanja',
+      'shopping': 'Belanja',
+      'ENTERTAINMENT': 'Hiburan',
+      'entertainment': 'Hiburan',
+      'HEALTH': 'Kesehatan',
+      'health': 'Kesehatan',
+      'EDUCATION': 'Pendidikan',
+      'education': 'Pendidikan',
+      'UTILITIES': 'Tagihan',
+      'utilities': 'Tagihan',
+      'OTHER': 'Lainnya',
+      'other': 'Lainnya'
+    };
+    return names[category] || category;
+  }
+
+  function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  }
+
+  function getCurrentPeriodId(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }
+
+  function generateTempId(): string {
+    return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+</script>
+
+<div class="add-expense-page">
+  <div class="page-header">
+    <button class="back-button" on:click={handleCancel}>
+      ← Back
+    </button>
+    <h1 class="page-title">Add Expense</h1>
+  </div>
+
+  <div class="expense-container">
+    {#if !showSuccessState}
+      <!-- Smart Warning -->
+      {#if $smartWarning.show}
+        <SmartWarning type={$smartWarning.type} data={$smartWarning.data} />
+      {/if}
+
+      <!-- Form -->
+      <form class="expense-form glass-card" on:submit={handleSubmit}>
+        <!-- Input Method Selection -->
+        <div class="input-method-section">
+          <div class="method-option active">
+            <div class="method-icon">✏️</div>
+            <div class="method-info">
+              <h3>Manual Input</h3>
+              <p>Enter expense details manually</p>
+            </div>
+          </div>
+          <div class="method-option disabled">
+            <div class="method-icon">📷</div>
+            <div class="method-info">
+              <h3>Invoice OCR</h3>
+              <p>Coming Soon - Scan receipt automatically</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Amount Input -->
+        <div class="form-group">
+          <label for="expenseAmount" class="form-label">Amount *</label>
+          <div class="currency-input-group">
+            <span class="currency-prefix">Rp</span>
+            <input
+              type="text"
+              id="expenseAmount"
+              class="glass-input currency-input"
+              class:error-state={$errors.amount}
+              placeholder="0"
+              value={$formData.amount}
+              on:input={handleAmountInput}
+              required
+            />
+          </div>
+          {#if $errors.amount}
+            <div class="field-error">{$errors.amount}</div>
+          {/if}
+        </div>
+
+        <!-- Category Selection -->
+        <div class="form-group">
+          <label for="expenseCategory" class="form-label">Category *</label>
+          <div class="select-wrapper">
+            <select
+              id="expenseCategory"
+              class="glass-input category-select"
+              class:error-state={$errors.category}
+              value={$formData.category}
+              on:change={handleCategoryChange}
+              disabled={!$hasCategories}
+            >
+              {#if $hasCategories}
+                <option value="OTHER">Choose category</option>
+                {#each categories as category}
+                  {#if !category.disabled}
+                    <option value={category.value}>{category.label}</option>
+                  {/if}
+                {/each}
+              {:else}
+                <option value="OTHER">💡 Set up budget first to track by category</option>
+              {/if}
+            </select>
+            <div class="select-arrow">▼</div>
+          </div>
+          {#if $errors.category}
+            <div class="field-error">{$errors.category}</div>
+          {/if}
+        </div>
+
+        <!-- Date Input -->
+        <div class="form-group">
+          <label for="expenseDate" class="form-label">Date *</label>
+          <input
+            type="date"
+            id="expenseDate"
+            class="glass-input date-input"
+            class:error-state={$errors.date}
+            value={$formData.date}
+            on:change={handleDateChange}
+            required
+          />
+          {#if $errors.date}
+            <div class="field-error">{$errors.date}</div>
+          {/if}
+        </div>
+
+        <!-- Description Input -->
+        <div class="form-group">
+          <label for="expenseDescription" class="form-label">Notes (Optional)</label>
+          <input
+            type="text"
+            id="expenseDescription"
+            class="glass-input"
+            class:error-state={$errors.description}
+            placeholder="What did you spend on?"
+            value={$formData.description}
+            on:input={handleDescriptionInput}
+          />
+          {#if $errors.description}
+            <div class="field-error">{$errors.description}</div>
+          {/if}
+        </div>
+
+        <!-- System Error -->
+        {#if $errors.system}
+          <div class="system-error-container">
+            <div class="system-error field-error show">{$errors.system}</div>
+          </div>
+        {/if}
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" on:click={handleCancel}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="btn-primary"
+            disabled={!$isFormValid || isSubmitting}
+          >
+            {#if isSubmitting}
+              <span class="loading-spinner"></span>
+              Saving...
+            {:else}
+              Save Expense
+            {/if}
+          </button>
+        </div>
+      </form>
+    {:else}
+      <!-- Success State -->
+      <div class="success-container glass-card">
+        <div class="success-icon">✅</div>
+        <h2>Expense Saved!</h2>
+        <p>Your expense has been recorded successfully</p>
+        <div class="expense-summary">
+          <div class="amount">{formatCurrency(parseCurrencyInput($formData.amount))}</div>
+          <div class="category">{formatCategoryName($formData.category)}</div>
+        </div>
+      </div>
+    {/if}
+  </div>
+</div>
+
+<style>
+  .add-expense-page {
+    min-height: 100vh;
+    position: relative;
+    padding: 1rem;
+    /* Apply glassmorphism background system */
+    background:
+      radial-gradient(circle at 20% 80%, rgba(0, 191, 255, 0.04) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(30, 144, 255, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, rgba(0, 123, 255, 0.02) 0%, transparent 40%),
+      linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
+    overflow: hidden;
+  }
+
+  .add-expense-page::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      radial-gradient(circle at 25% 25%, rgba(0, 191, 255, 0.03) 0%, transparent 30%),
+      radial-gradient(circle at 75% 75%, rgba(30, 144, 255, 0.02) 0%, transparent 30%),
+      radial-gradient(circle at 50% 10%, rgba(0, 123, 255, 0.025) 0%, transparent 25%);
+    animation: float-accent 20s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .back-button {
+    /* Apply floating glassmorphism styling */
+    background: linear-gradient(135deg,
+      rgba(0, 191, 255, 0.7) 0%,
+      rgba(30, 144, 255, 0.8) 100%);
+    backdrop-filter: blur(25px) saturate(1.8);
+    -webkit-backdrop-filter: blur(25px) saturate(1.8);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 12px;
+    color: white;
+    box-shadow:
+      0 8px 32px rgba(0, 191, 255, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+  }
+
+  .back-button:hover {
+    background: linear-gradient(135deg,
+      rgba(0, 191, 255, 0.85) 0%,
+      rgba(30, 144, 255, 0.9) 100%);
+    transform: translateY(-3px) scale(1.03);
+    box-shadow:
+      0 12px 40px rgba(0, 191, 255, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(30px) saturate(2);
+    -webkit-backdrop-filter: blur(30px) saturate(2);
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin: 0;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  }
+
+  .expense-container {
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .glass-card {
+    /* Secondary glassmorphism styling */
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(240, 248, 255, 0.4) 50%,
+      rgba(248, 252, 255, 0.6) 100%);
+    backdrop-filter: blur(25px) saturate(1.8);
+    -webkit-backdrop-filter: blur(25px) saturate(1.8);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 12px;
+    box-shadow:
+      0 8px 32px rgba(0, 191, 255, 0.03),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    z-index: 1;
+  }
+
+  .expense-form {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .input-method-section {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .method-option {
+    flex: 1;
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .method-option.active {
+    border-color: var(--gold-primary);
+    background: rgba(184, 134, 11, 0.1);
+  }
+
+  .method-option.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .method-icon {
+    font-size: 1.5rem;
+  }
+
+  .method-info h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .method-info p {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #6b7280;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .form-label {
+    font-weight: 500;
+    color: #4a5568;
+    font-size: 0.95rem;
+  }
+
+  .glass-input {
+    padding: 0.875rem 1rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: #1f2937;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    width: 100%;
+  }
+
+  .glass-input::placeholder {
+    color: #9ca3af;
+  }
+
+  .glass-input:focus {
+    outline: none;
+    border-color: #0891B2;
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.1);
+  }
+
+  .glass-input.error-state {
+    border-color: var(--danger-red);
+    background: rgba(239, 68, 68, 0.05);
+  }
+
+  .currency-input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .currency-prefix {
+    position: absolute;
+    left: 1rem;
+    color: #6b7280;
+    font-weight: 500;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .currency-input {
+    padding-left: 2.75rem;
+    text-align: right;
+    font-weight: 500;
+  }
+
+  .select-wrapper {
+    position: relative;
+  }
+
+  .category-select {
+    appearance: none;
+    padding-right: 2.5rem;
+    cursor: pointer;
+  }
+
+  .category-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .select-arrow {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+    pointer-events: none;
+    font-size: 0.8rem;
+    transition: transform 0.3s ease;
+  }
+
+  .category-select:focus + .select-arrow {
+    transform: translateY(-50%) rotate(180deg);
+  }
+
+  .date-input {
+    font-family: inherit;
+  }
+
+  .field-error {
+    color: var(--danger-red);
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-top: 0.25rem;
+    animation: shake 0.5s ease;
+  }
+
+  .system-error-container {
+    margin: 0.5rem 0;
+  }
+
+  .system-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    padding: 0.75rem;
+    color: var(--danger-red);
+    font-weight: 500;
+    text-align: center;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+  }
+
+  .btn-secondary, .btn-primary {
+    flex: 1;
+    padding: 0.875rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: none;
+  }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .btn-primary {
+    /* Floating glassmorphism for primary action */
+    background: linear-gradient(135deg,
+      rgba(0, 191, 255, 0.7) 0%,
+      rgba(30, 144, 255, 0.8) 100%);
+    backdrop-filter: blur(25px) saturate(1.8);
+    -webkit-backdrop-filter: blur(25px) saturate(1.8);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: white;
+    box-shadow:
+      0 8px 32px rgba(0, 191, 255, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg,
+      rgba(0, 191, 255, 0.85) 0%,
+      rgba(30, 144, 255, 0.9) 100%);
+    transform: translateY(-3px) scale(1.03);
+    box-shadow:
+      0 12px 40px rgba(0, 191, 255, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(30px) saturate(2);
+    -webkit-backdrop-filter: blur(30px) saturate(2);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .loading-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .success-container {
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .success-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .success-container h2 {
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+  }
+
+  .success-container p {
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+  }
+
+  .expense-summary {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    padding: 1rem;
+  }
+
+  .expense-summary .amount {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #10b981;
+    margin-bottom: 0.25rem;
+  }
+
+  .expense-summary .category {
+    color: #6b7280;
+    font-size: 0.9rem;
+  }
+
+  /* Animations */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes float-accent {
+    0%, 100% {
+      transform: translateY(0px) rotate(0deg);
+    }
+    33% {
+      transform: translateY(-10px) rotate(120deg);
+    }
+    66% {
+      transform: translateY(5px) rotate(240deg);
+    }
+  }
+
+  /* Mobile responsiveness */
+  @media (max-width: 768px) {
+    .add-expense-page {
+      padding: 0.5rem;
+    }
+
+    .expense-form {
+      padding: 1rem;
+      gap: 1rem;
+    }
+
+    .form-actions {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .btn-secondary, .btn-primary {
+      padding: 1rem;
+    }
+
+    .input-method-section {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+  }
+</style>
