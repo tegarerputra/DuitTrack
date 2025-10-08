@@ -7,9 +7,10 @@ import type { UserProfile, BudgetSummary, Period } from '$lib/types';
  * Uses multiple methods to determine if budget is configured
  *
  * @param userProfile - User profile data
+ * @param budgetData - Optional budget data to verify actual budget exists
  * @returns true if budget is set up
  */
-export function checkBudgetSetup(userProfile: UserProfile | null): boolean {
+export function checkBudgetSetup(userProfile: UserProfile | null, budgetData?: any): boolean {
   if (!userProfile) return false;
 
   // Method 1: Check explicit flag
@@ -17,7 +18,12 @@ export function checkBudgetSetup(userProfile: UserProfile | null): boolean {
     return userProfile.hasBudgetSetup;
   }
 
-  // Default to false if no flag is set
+  // Method 2: Check if budget data exists and has valid total budget
+  if (budgetData && budgetData.totalBudget > 0) {
+    return true;
+  }
+
+  // Default to false if no flag is set and no budget data
   return false;
 }
 
@@ -218,6 +224,126 @@ function formatRupiah(amount: number): string {
   const numAmount = Math.abs(Math.floor(amount));
   const formatted = numAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return formatted;
+}
+
+/**
+ * Calculate days left in current month
+ */
+export function calculateDaysLeft(): number {
+  const today = new Date();
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const diffTime = endOfMonth.getTime() - today.getTime();
+  return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+}
+
+/**
+ * Calculate days elapsed in current month
+ */
+export function calculateDaysElapsed(): number {
+  return Math.max(1, new Date().getDate());
+}
+
+/**
+ * Calculate total days in current month
+ */
+export function calculateDaysInMonth(): number {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+}
+
+/**
+ * Calculate time progress percentage in current month
+ */
+export function calculateTimeProgress(): number {
+  return (calculateDaysElapsed() / calculateDaysInMonth()) * 100;
+}
+
+/**
+ * Calculate daily spending average
+ */
+export function calculateDailyAverage(totalSpent: number): number {
+  return totalSpent / calculateDaysElapsed();
+}
+
+/**
+ * Calculate monthly projection based on current spending
+ */
+export function calculateMonthlyProjection(totalSpent: number): number {
+  const dailyAverage = calculateDailyAverage(totalSpent);
+  return dailyAverage * calculateDaysInMonth();
+}
+
+/**
+ * Calculate budget efficiency score (0-100)
+ */
+export function calculateBudgetEfficiency(
+  totalBudget: number,
+  totalSpent: number
+): number {
+  if (totalBudget <= 0) return 0;
+
+  const spentPercentage = (totalSpent / totalBudget) * 100;
+  const timeProgress = calculateTimeProgress();
+
+  return Math.max(0, 100 - Math.abs(spentPercentage - timeProgress));
+}
+
+/**
+ * Calculate savings potential
+ */
+export function calculateSavingsPotential(
+  totalBudget: number,
+  totalSpent: number
+): number {
+  const remaining = Math.max(0, totalBudget - totalSpent);
+  const daysLeft = calculateDaysLeft();
+  const currentDailyRate = calculateDailyAverage(totalSpent);
+  const optimalDailyRate = totalBudget / calculateDaysInMonth();
+
+  if (currentDailyRate >= optimalDailyRate || remaining <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, remaining - (currentDailyRate * daysLeft));
+}
+
+/**
+ * Get playful budget status message (Indonesian)
+ */
+export function getPlayfulBudgetStatus(percentage: number): {
+  message: string;
+  emoji: string;
+  variant: 'success' | 'warning' | 'danger';
+} {
+  if (percentage >= 100) {
+    return {
+      message: 'Waduh, budget habis! 😅',
+      emoji: '🚨',
+      variant: 'danger',
+    };
+  }
+
+  if (percentage >= 90) {
+    return {
+      message: 'Udah mepet nih! 😰',
+      emoji: '⚠️',
+      variant: 'warning',
+    };
+  }
+
+  if (percentage >= 70) {
+    return {
+      message: 'Hati-hati ya 👀',
+      emoji: '🟡',
+      variant: 'warning',
+    };
+  }
+
+  return {
+    message: 'Aman terkendali 😎',
+    emoji: '✅',
+    variant: 'success',
+  };
 }
 
 /**

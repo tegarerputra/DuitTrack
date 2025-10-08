@@ -1,0 +1,43 @@
+/**
+ * Dashboard Configuration Constants
+ * Centralized configuration for dashboard thresholds and settings
+ */
+
+export const SCROLL_CONFIG = {
+  THRESHOLD: 50,
+  HIDE_SCROLL_THRESHOLD: 200,
+  SHOW_SCROLL_THRESHOLD: 100,
+} as const;
+
+export const BUDGET_THRESHOLDS = {
+  WARNING: 80,
+  DANGER: 100,
+  SAFE: 70,
+  EFFICIENCY_EXCELLENT: 80,
+  EFFICIENCY_MODERATE: 60,
+} as const;
+
+export const INSIGHT_THRESHOLDS = {
+  SPENDING_FAST_OFFSET: 15,
+  SPENDING_SLOW_OFFSET: 15,
+  CATEGORY_WARNING: 90,
+  CATEGORY_DANGER: 100,
+  HIGH_SPENDING_MULTIPLIER: 1.2,
+  SAVINGS_THRESHOLD_MULTIPLIER: 0.8,
+  RECENT_DAYS: 7,
+  MIN_RECENT_EXPENSES: 3,
+  SAVINGS_MIN_AMOUNT: 50000,
+} as const;
+
+export const UI_CONFIG = {
+  MAX_RECENT_TRANSACTIONS: 5,
+  MAX_INSIGHTS_DISPLAYED: 3,
+  ANIMATION_DURATION: 300,
+  DEBOUNCE_SCROLL: 16, // ~60fps
+} as const;
+
+export const PERIOD_CONFIG = {
+  DEFAULT_RESET_DATE: 25,
+  DEFAULT_RESET_TYPE: 'fixed',
+  PERIODS_TO_GENERATE: 3,
+} as const;

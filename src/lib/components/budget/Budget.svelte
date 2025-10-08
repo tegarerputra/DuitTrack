@@ -457,27 +457,43 @@
     return Math.max(0, diffDays);
   }
 
-  function loadDummyData() {
-    // Create dummy budget categories with various spending levels
-    const dummyCategories = [
-      { id: 'food', name: 'Makanan', emoji: '🍽️', budget: 2000000, spent: 1450000 },
-      { id: 'transport', name: 'Transport', emoji: '🚗', budget: 1000000, spent: 650000 },
-      { id: 'shopping', name: 'Belanja', emoji: '🛍️', budget: 1500000, spent: 1890000 },
-      { id: 'entertainment', name: 'Hiburan', emoji: '🎬', budget: 800000, spent: 520000 },
-      { id: 'utilities', name: 'Tagihan', emoji: '💡', budget: 600000, spent: 580000 },
-      { id: 'savings', name: 'Tabungan', emoji: '💰', budget: 3000000, spent: 2500000 }
-    ];
+  async function loadDummyData() {
+    // Import centralized dummy data
+    const { getDummyCategories, generateDummyExpenses } = await import('$lib/utils/dummyData');
 
-    categories = dummyCategories;
-    budgetData.set({
-      categories: Object.fromEntries(
-        dummyCategories.map(cat => [cat.id, { budget: cat.budget, spent: cat.spent }])
-      ),
-      totalBudget: dummyCategories.reduce((sum, cat) => sum + cat.budget, 0),
-      totalSpent: dummyCategories.reduce((sum, cat) => sum + cat.spent, 0)
+    // Get expenses from store/cache (same data as Dashboard & Expenses)
+    const expenses = generateDummyExpenses(25);
+
+    // Calculate spent per category from actual expenses
+    const categorySpending: Record<string, number> = {};
+    expenses.forEach((expense: any) => {
+      const categoryId = expense.category.toLowerCase();
+      categorySpending[categoryId] = (categorySpending[categoryId] || 0) + expense.amount;
     });
 
-    console.log('📊 Dummy budget data loaded');
+    // Get categories with budget amounts
+    const dummyCategories = getDummyCategories();
+
+    // Combine budget with REAL spending from expenses
+    categories = dummyCategories.map(cat => ({
+      ...cat,
+      spent: categorySpending[cat.id] || 0  // Use real spending from expenses
+    }));
+
+    // Calculate totals
+    const totalBudget = categories.reduce((sum, cat) => sum + cat.budget, 0);
+    const totalSpent = categories.reduce((sum, cat) => sum + cat.spent, 0);
+
+    budgetData.set({
+      categories: Object.fromEntries(
+        categories.map(cat => [cat.id, { budget: cat.budget, spent: cat.spent }])
+      ),
+      totalBudget,
+      totalSpent
+    });
+
+    console.log('📊 Dummy budget data loaded (using shared store expenses)');
+    console.log('💰 Budget total spent:', totalSpent);
   }
 </script>
 

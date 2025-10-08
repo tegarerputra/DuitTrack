@@ -157,10 +157,16 @@
     align-items: center;
     justify-content: space-between;
     height: 64px;
-    padding: 0 20px;
+    padding: 0 16px;
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
+  }
+
+  @media (min-width: 768px) {
+    .container {
+      padding: 0 20px;
+    }
   }
 
   .logo {

@@ -200,18 +200,21 @@
   /* Enhanced variant styles with water effects */
   .liquid-btn-primary {
     background: linear-gradient(135deg,
-      var(--water-primary, #06B6D4) 0%,
-      var(--water-secondary, #0891B2) 100%);
+      rgba(0, 191, 255, 0.55) 0%,
+      rgba(30, 144, 255, 0.65) 100%);
     color: white;
-    border: 1px solid var(--water-glass-border, rgba(6, 182, 212, 0.2));
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 16px rgba(0, 191, 255, 0.12);
+    backdrop-filter: blur(10px);
   }
 
   .liquid-btn-primary:hover {
     background: linear-gradient(135deg,
-      var(--water-secondary, #0891B2) 0%,
-      var(--water-dark, #0E7490) 100%);
-    box-shadow: var(--water-shadow-medium, 0 12px 40px rgba(6, 182, 212, 0.15));
+      rgba(0, 191, 255, 0.7) 0%,
+      rgba(30, 144, 255, 0.8) 100%);
+    box-shadow: 0 8px 24px rgba(0, 191, 255, 0.18);
     transform: translateY(-2px) scale(1.05);
+    border-color: rgba(255, 255, 255, 0.4);
   }
 
   .liquid-btn-primary .water-ripple {
@@ -273,29 +276,32 @@
 
   .liquid-btn-secondary {
     background: linear-gradient(135deg,
-      var(--water-glass-light, rgba(103, 232, 249, 0.08)) 0%,
-      var(--water-glass-secondary, rgba(8, 145, 178, 0.12)) 100%);
-    color: var(--water-primary, #06B6D4);
-    border: 1px solid var(--water-glass-border, rgba(6, 182, 212, 0.2));
+      rgba(0, 191, 255, 0.1) 0%,
+      rgba(30, 144, 255, 0.12) 100%);
+    color: #1E90FF;
+    border: 1px solid rgba(0, 191, 255, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 191, 255, 0.08);
   }
 
   .liquid-btn-secondary:hover {
     background: linear-gradient(135deg,
-      var(--water-glass-secondary, rgba(8, 145, 178, 0.12)) 0%,
-      var(--water-glass-primary, rgba(6, 182, 212, 0.15)) 100%);
-    color: var(--water-secondary, #0891B2);
+      rgba(0, 191, 255, 0.18) 0%,
+      rgba(30, 144, 255, 0.22) 100%);
+    color: #007BFF;
     transform: translateY(-2px) scale(1.05);
+    border-color: rgba(0, 191, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 191, 255, 0.12);
   }
 
   .liquid-btn-ghost {
     background: transparent;
-    color: var(--water-primary, #06B6D4);
+    color: #1E90FF;
     border: 1px solid transparent;
   }
 
   .liquid-btn-ghost:hover {
-    background: var(--water-glass-light, rgba(103, 232, 249, 0.08));
-    border-color: var(--water-glass-border, rgba(6, 182, 212, 0.2));
+    background: rgba(0, 191, 255, 0.08);
+    border-color: rgba(0, 191, 255, 0.2);
     transform: translateY(-1px) scale(1.02);
   }
 

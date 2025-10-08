@@ -1,24 +1,45 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { authStore, userStore, userProfileStore } from '$stores/auth';
   import { budgetStore } from '$stores/budget';
   import { expenseStore } from '$stores/expenses';
   import { goto } from '$app/navigation';
   import { formatRupiah } from '$utils/index';
-  import { checkBudgetSetup } from '$lib/utils/budgetHelpers';
+  import {
+    checkBudgetSetup,
+    getPlayfulBudgetStatus,
+    calculateDaysLeft
+  } from '$lib/utils/budgetHelpers';
+  import {
+    formatDate,
+    formatCategoryName,
+    getCategoryIcon,
+    getPlayfulCategoryIcon,
+    getPlayfulCategoryMessage,
+    timestampToDate
+  } from '$lib/utils/formatters';
+  import { SCROLL_CONFIG, BUDGET_THRESHOLDS, UI_CONFIG } from '$lib/config/dashboard.config';
   import { generatePeriods, formatPeriodDisplay, type PeriodGeneratorConfig } from '$lib/utils/periodHelpers';
   import { fly } from 'svelte/transition';
   import type { User as FirebaseUser } from 'firebase/auth';
   import type { UserProfile } from '$stores/auth';
-
-  export let params: Record<string, string> = {};
+  import type {
+    BudgetStatus,
+    BudgetData,
+    Expense,
+    Transaction,
+    CategoryAttention,
+    DashboardMetrics
+  } from '$lib/types/dashboard.types';
 
   // Components
   import AuthGuard from '$components/auth/AuthGuard.svelte';
   import FintechCard from '$lib/components/ui/FintechCard.svelte';
   import FintechButton from '$lib/components/ui/FintechButton.svelte';
   import FintechProgress from '$lib/components/ui/FintechProgress.svelte';
+  import SmartInsightsWidget from '$lib/components/insights/SmartInsightsWidget.svelte';
+  import FinancialHeroCard from '$lib/components/dashboard/FinancialHeroCard_Final.svelte';
 
   // Dashboard state
   let error: string | null = null;
@@ -31,37 +52,40 @@
   let currentPeriod: any = null;
 
   // Dashboard data
-  let budgetData: any = null;
-  let expenses: any[] = [];
-  let recentTransactions: any[] = [];
+  let budgetData: BudgetData | null = null;
+  let expenses: Expense[] = [];
+  let recentTransactions: Transaction[] = [];
   let loading = true;
 
   // Computed values
-  let totalBudget = 0;
-  let totalSpent = 0;
-  let percentage = 0;
-  let remaining = 0;
-  let budgetStatus: 'safe' | 'warning' | 'danger' = 'safe';
-  let todaySpending = 0;
-  let categoriesNeedAttention: any[] = [];
+  let metrics: DashboardMetrics = {
+    totalBudget: 0,
+    totalSpent: 0,
+    percentage: 0,
+    remaining: 0,
+    budgetStatus: 'safe',
+    todaySpending: 0
+  };
+  let categoriesNeedAttention: CategoryAttention[] = [];
 
   // Floating button scroll behavior
   let showFloatingButton = true;
   let lastScrollY = 0;
-  let scrollThreshold = 50;
+  let scrollThreshold = SCROLL_CONFIG.THRESHOLD;
+  let scrollHandlerCleanup: (() => void) | null = null;
 
   $: if (currentPeriodId) {
     loadDashboardData();
   }
 
-  // Subscribe to stores
-  $: budgetStore.subscribe((data) => {
-    if (data && data.month === currentPeriodId) {
-      budgetData = data;
-      calculateBudgetMetrics();
-      loading = false;
-    }
-  });
+  // Subscribe to stores - DISABLED for dummy data mode
+  // $: budgetStore.subscribe((data) => {
+  //   if (data && data.month === currentPeriodId) {
+  //     budgetData = data;
+  //     calculateBudgetMetrics();
+  //     loading = false;
+  //   }
+  // });
 
   $: expenseStore.subscribe((data) => {
     if (data && data.expenses && data.currentPeriod === currentPeriodId) {
@@ -74,15 +98,15 @@
   onMount(() => {
     if (browser) {
       initializeDashboard();
-      setupScrollListener();
+      scrollHandlerCleanup = setupScrollListener();
     }
+  });
 
-    // Cleanup function
-    return () => {
-      if (browser) {
-        window.removeEventListener('scroll', handleScroll);
-      }
-    };
+  onDestroy(() => {
+    // Proper cleanup for scroll listener
+    if (scrollHandlerCleanup) {
+      scrollHandlerCleanup();
+    }
   });
 
   async function initializeDashboard() {
@@ -91,8 +115,8 @@
         if (profile) {
           userProfile = profile;
 
-          // Check budget setup status
-          hasBudgetSetup = checkBudgetSetup(profile);
+          // Check budget setup status (will be re-checked after budget data loads)
+          hasBudgetSetup = checkBudgetSetup(profile, budgetData);
 
           // Update period based on user's reset date
           if (profile.budgetResetDate !== undefined) {
@@ -148,10 +172,10 @@
       // TEMPORARY: Load dummy data for development
       loadDummyData();
 
-      // Load budget and expense data
-      if (budgetStore && typeof budgetStore.loadBudgetData === 'function') {
-        await budgetStore.loadBudgetData(currentPeriodId);
-      }
+      // DISABLED: Using dummy data instead of budget store mock
+      // if (budgetStore && typeof budgetStore.loadBudgetData === 'function') {
+      //   await budgetStore.loadBudgetData(currentPeriodId);
+      // }
 
       // Note: expenseStore loading will be implemented when needed
 
@@ -160,103 +184,75 @@
     }
   }
 
-  function loadDummyData() {
-    // Create consistent dummy data across all pages
-    const dummyCategories = [
-      { id: 'food', name: 'Makanan', emoji: '🍽️', budget: 2000000, spent: 1450000 },
-      { id: 'transport', name: 'Transport', emoji: '🚗', budget: 1000000, spent: 650000 },
-      { id: 'shopping', name: 'Belanja', emoji: '🛍️', budget: 1500000, spent: 1890000 },
-      { id: 'entertainment', name: 'Hiburan', emoji: '🎬', budget: 800000, spent: 520000 },
-      { id: 'utilities', name: 'Tagihan', emoji: '💡', budget: 600000, spent: 580000 },
-      { id: 'savings', name: 'Tabungan', emoji: '💰', budget: 3000000, spent: 2500000 }
-    ];
+  async function loadDummyData() {
+    // Import centralized dummy data
+    const { getDummyBudgetData, generateDummyExpenses } = await import('$lib/utils/dummyData');
 
-    // Calculate totals
-    const totalBudget = dummyCategories.reduce((sum, cat) => sum + cat.budget, 0);
-    const totalSpent = dummyCategories.reduce((sum, cat) => sum + cat.spent, 0);
+    // Load expenses - this will use store/cache if available
+    expenses = generateDummyExpenses(25);
 
-    // Set budget data
+    // Calculate REAL total from expenses
+    const realTotalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+
+    // Load budget data with REAL spent amount
+    const budgetDummyData = getDummyBudgetData();
     budgetData = {
-      categories: Object.fromEntries(
-        dummyCategories.map(cat => [cat.id, { budget: cat.budget, spent: cat.spent }])
-      ),
-      totalBudget,
-      totalSpent,
+      categories: budgetDummyData.categories,
+      totalBudget: budgetDummyData.totalBudget,
+      totalSpent: realTotalSpent, // Use real calculated total
       month: currentPeriodId
     };
 
-    // Generate dummy expenses
-    const today = new Date();
-    const dummyExpenses: any[] = [];
-
-    // Generate 20-30 expenses spread over the month
-    for (let i = 0; i < 25; i++) {
-      const categoryIndex = Math.floor(Math.random() * dummyCategories.length);
-      const category = dummyCategories[categoryIndex];
-      const daysAgo = Math.floor(Math.random() * 30);
-      const date = new Date(today);
-      date.setDate(date.getDate() - daysAgo);
-
-      const descriptions: Record<string, string[]> = {
-        'food': ['Lunch di warung', 'Coffee shop', 'Belanja groceries', 'Makan malam'],
-        'transport': ['Grab ride', 'Isi bensin', 'Parkir', 'Tol'],
-        'shopping': ['Beli baju', 'Elektronik', 'Beli buku', 'Peralatan rumah'],
-        'entertainment': ['Nonton bioskop', 'Konser', 'Game', 'Netflix'],
-        'utilities': ['Listrik', 'Air', 'Internet', 'Pulsa'],
-        'savings': ['Transfer tabungan', 'Investasi', 'Dana darurat', 'Deposito']
-      };
-
-      const categoryDescriptions = descriptions[category.id] || ['Pengeluaran'];
-      const description = categoryDescriptions[Math.floor(Math.random() * categoryDescriptions.length)];
-
-      dummyExpenses.push({
-        id: `dummy_${i}`,
-        amount: Math.floor(Math.random() * 150000) + 20000,
-        category: category.id.toUpperCase(),
-        description,
-        date,
-        userId: 'dummy_user'
-      });
-    }
-
-    expenses = dummyExpenses.sort((a, b) => b.date.getTime() - a.date.getTime());
+    // Re-check budget setup status now that budgetData is loaded
+    hasBudgetSetup = checkBudgetSetup(userProfile, budgetData);
 
     calculateBudgetMetrics();
     calculateExpenseMetrics();
     loading = false;
 
-    console.log('📊 Dummy data loaded for Dashboard');
+    console.log('📊 Dummy data loaded for Dashboard (using shared store)');
+    console.log('💰 Real total spent:', realTotalSpent);
+    console.log('✅ Budget setup detected:', hasBudgetSetup);
   }
 
   function calculateBudgetMetrics() {
     if (!budgetData) return;
 
-    totalBudget = budgetData.totalBudget || 0;
-    totalSpent = budgetData.totalSpent || 0;
-    percentage = totalBudget > 0 ? Math.min(100, (totalSpent / totalBudget) * 100) : 0;
-    remaining = Math.max(0, totalBudget - totalSpent);
+    const totalBudget = budgetData.totalBudget || 0;
+    const totalSpent = budgetData.totalSpent || 0;
+    const percentage = totalBudget > 0 ? Math.min(100, (totalSpent / totalBudget) * 100) : 0;
+    const remaining = Math.max(0, totalBudget - totalSpent);
 
-    // Determine budget status
-    if (percentage >= 100) {
+    // Determine budget status using constants
+    let budgetStatus: BudgetStatus = 'safe';
+    if (percentage >= BUDGET_THRESHOLDS.DANGER) {
       budgetStatus = 'danger';
-    } else if (percentage >= 80) {
+    } else if (percentage >= BUDGET_THRESHOLDS.WARNING) {
       budgetStatus = 'warning';
-    } else {
-      budgetStatus = 'safe';
     }
+
+    // Update metrics object
+    metrics = {
+      totalBudget,
+      totalSpent,
+      percentage,
+      remaining,
+      budgetStatus,
+      todaySpending: metrics.todaySpending
+    };
 
     // Calculate categories that need attention
     categoriesNeedAttention = [];
     if (budgetData.categories) {
       Object.entries(budgetData.categories).forEach(([category, data]: [string, any]) => {
         const categoryPercentage = data.budget > 0 ? (data.spent / data.budget) * 100 : 0;
-        if (categoryPercentage >= 80) {
+        if (categoryPercentage >= BUDGET_THRESHOLDS.WARNING) {
           categoriesNeedAttention.push({
             category,
             percentage: categoryPercentage,
             spent: data.spent,
             budget: data.budget,
-            status: categoryPercentage >= 100 ? 'danger' : 'warning'
+            status: categoryPercentage >= BUDGET_THRESHOLDS.DANGER ? 'danger' : 'warning'
           });
         }
       });
@@ -269,137 +265,52 @@
   function calculateExpenseMetrics() {
     if (!expenses.length) return;
 
-    // Get recent transactions (last 5)
+    // Get recent transactions (last 5) using UI config
     recentTransactions = expenses
       .slice()
       .sort((a, b) => {
-        const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-        const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+        const dateA = timestampToDate(a.date);
+        const dateB = timestampToDate(b.date);
         return dateB.getTime() - dateA.getTime();
       })
-      .slice(0, 5);
+      .slice(0, UI_CONFIG.MAX_RECENT_TRANSACTIONS) as Transaction[];
 
     // Calculate today's spending
     const today = new Date();
-    todaySpending = expenses
+    const todaySpending = expenses
       .filter(expense => {
-        const expenseDate = expense.date?.toDate ? expense.date.toDate() : new Date(expense.date);
+        const expenseDate = timestampToDate(expense.date);
         return expenseDate.toDateString() === today.toDateString();
       })
       .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+    // Update metrics
+    metrics = { ...metrics, todaySpending };
   }
 
 
-  function getCategoryIcon(category: string): string {
-    const icons: Record<string, string> = {
-      'FOOD': '🍽️', 'SNACK': '🍿', 'HOUSEHOLD': '🏠',
-      'FRUIT': '🍎', 'TRANSPORT': '🚗', 'ENTERTAINMENT': '🎬',
-      'HEALTH': '🏥', 'EDUCATION': '📚', 'SHOPPING': '🛍️',
-      'BILLS': '💰', 'OTHER': '📦'
+  // Helper functions now imported from utils/formatters.ts and utils/budgetHelpers.ts
+  function getBudgetStatusColor(status: BudgetStatus): string {
+    const colors = {
+      safe: 'bg-green-500',
+      warning: 'bg-yellow-500',
+      danger: 'bg-red-500'
     };
-    return icons[category?.toUpperCase()] || '💰';
+    return colors[status];
   }
 
-  function formatCategoryName(category: string): string {
-    const names: Record<string, string> = {
-      'FOOD': 'Makanan', 'SNACK': 'Jajan', 'HOUSEHOLD': 'Rumah Tangga',
-      'FRUIT': 'Buah-buahan', 'TRANSPORT': 'Transportasi', 'ENTERTAINMENT': 'Hiburan',
-      'HEALTH': 'Kesehatan', 'EDUCATION': 'Pendidikan', 'SHOPPING': 'Belanja',
-      'BILLS': 'Tagihan', 'OTHER': 'Lainnya'
+  function getBudgetStatusIcon(status: BudgetStatus): string {
+    const icons = {
+      safe: '🟢',
+      warning: '🟡',
+      danger: '🔴'
     };
-    return names[category?.toUpperCase()] || category || 'Lainnya';
+    return icons[status];
   }
 
-  function formatDate(date: Date): string {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) return 'Hari ini';
-    if (date.toDateString() === yesterday.toDateString()) return 'Kemarin';
-    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-  }
-
-  function getBudgetStatusColor(): string {
-    switch (budgetStatus) {
-      case 'safe': return 'bg-green-500';
-      case 'warning': return 'bg-yellow-500';
-      case 'danger': return 'bg-red-500';
-      default: return 'bg-gray-500';
-    }
-  }
-
-  function getBudgetStatusIcon(): string {
-    switch (budgetStatus) {
-      case 'safe': return '🟢';
-      case 'warning': return '🟡';
-      case 'danger': return '🔴';
-      default: return '⚪';
-    }
-  }
-
-  // Playful Indonesian status messages
-  function getPlayfulBudgetStatus(percentage: number): { message: string; emoji: string; variant: 'success' | 'warning' | 'danger' } {
-    if (percentage >= 100) {
-      return {
-        message: 'Waduh, budget habis! 😅',
-        emoji: '🚨',
-        variant: 'danger'
-      };
-    } else if (percentage >= 90) {
-      return {
-        message: 'Udah mepet nih! 😰',
-        emoji: '⚠️',
-        variant: 'warning'
-      };
-    } else if (percentage >= 70) {
-      return {
-        message: 'Hati-hati ya 👀',
-        emoji: '🟡',
-        variant: 'warning'
-      };
-    } else {
-      return {
-        message: 'Aman terkendali 😎',
-        emoji: '✅',
-        variant: 'success'
-      };
-    }
-  }
-
-  function getPlayfulCategoryIcon(category: string): string {
-    const playfulIcons: Record<string, string> = {
-      'FOOD': '🍜', // More Indonesian/Asian focused
-      'SNACK': '🧋', // Bubble tea - popular in Indonesia
-      'HOUSEHOLD': '🏡',
-      'FRUIT': '🥭', // Mango - Indonesian favorite
-      'TRANSPORT': '🏍️', // Motorcycle - common in Indonesia
-      'ENTERTAINMENT': '🎮',
-      'HEALTH': '💊',
-      'EDUCATION': '📖',
-      'SHOPPING': '🛒',
-      'BILLS': '📱', // Phone bills very common
-      'OTHER': '✨'
-    };
-    return playfulIcons[category?.toUpperCase()] || '💫';
-  }
-
-  function getPlayfulCategoryMessage(category: string): string {
-    const messages: Record<string, string> = {
-      'FOOD': 'Makan enak dong! 😋',
-      'SNACK': 'Jajan lagi nih 🤤',
-      'TRANSPORT': 'Gas poll! 🏍️💨',
-      'ENTERTAINMENT': 'Me time dulu 🎬',
-      'SHOPPING': 'Belanja therapeutic 🛍️',
-      'BILLS': 'Bayar tagihan dulu 💸',
-      'OTHER': 'Ada apa nih? 🤔'
-    };
-    return messages[category?.toUpperCase()] || 'Pengeluaran baru 💫';
-  }
-
-  // Scroll behavior for floating button
-  function setupScrollListener() {
-    if (!browser) return;
+  // Scroll behavior for floating button - improved with proper cleanup
+  function setupScrollListener(): (() => void) | null {
+    if (!browser) return null;
 
     // Set initial scroll position
     lastScrollY = window.scrollY;
@@ -417,29 +328,34 @@
       }
     }
 
+    function handleScroll() {
+      if (!browser) return;
+
+      const currentScrollY = window.scrollY;
+
+      // Only hide/show if we've scrolled past threshold
+      if (Math.abs(currentScrollY - lastScrollY) < scrollThreshold) {
+        return;
+      }
+
+      // Show button when scrolling up or at top
+      if (currentScrollY < lastScrollY || currentScrollY < SCROLL_CONFIG.SHOW_SCROLL_THRESHOLD) {
+        showFloatingButton = true;
+      }
+      // Hide button when scrolling down
+      else if (currentScrollY > lastScrollY && currentScrollY > SCROLL_CONFIG.HIDE_SCROLL_THRESHOLD) {
+        showFloatingButton = false;
+      }
+
+      lastScrollY = currentScrollY;
+    }
+
     window.addEventListener('scroll', handleScrollThrottled, { passive: true });
-  }
 
-  function handleScroll() {
-    if (!browser) return;
-
-    const currentScrollY = window.scrollY;
-
-    // Only hide/show if we've scrolled past threshold
-    if (Math.abs(currentScrollY - lastScrollY) < scrollThreshold) {
-      return;
-    }
-
-    // Show button when scrolling up or at top
-    if (currentScrollY < lastScrollY || currentScrollY < 100) {
-      showFloatingButton = true;
-    }
-    // Hide button when scrolling down
-    else if (currentScrollY > lastScrollY && currentScrollY > 200) {
-      showFloatingButton = false;
-    }
-
-    lastScrollY = currentScrollY;
+    // Return cleanup function
+    return () => {
+      window.removeEventListener('scroll', handleScrollThrottled);
+    };
   }
 </script>
 
@@ -478,7 +394,7 @@
               <h1 class="page-title">Dashboard</h1>
             </div>
 
-            <!-- Period Selector & Settings -->
+            <!-- Period Selector -->
             <div class="header-actions">
               <div class="period-selector">
                 <div class="period-label">Periode Tracking</div>
@@ -488,15 +404,6 @@
                   <span class="period-arrow">▼</span>
                 </div>
               </div>
-
-              <!-- Settings Quick Link -->
-              <button
-                on:click={() => goto('/settings')}
-                class="settings-quick-link"
-                title="Settings"
-              >
-                <span class="settings-icon">⚙️</span>
-              </button>
             </div>
           </div>
         </div>
@@ -504,130 +411,21 @@
         <!-- Main Dashboard Grid -->
         <div class="dashboard-grid">
 
-          <!-- HERO CARD - Budget Overview OR Simple Spending (Dual Mode!) -->
+          <!-- NEW FINANCIAL HERO CARD -->
           <div class="hero-card-container">
-            {#if !hasBudgetSetup}
-              <!-- Simple Mode: No Budget Setup -->
-              <div class="hero-budget-card hero-gradient-safe liquid-card">
-                <div class="hero-glass-overlay"></div>
-                {#if loading}
-                  <div class="hero-loading">
-                    <div class="loading-bar loading-1"></div>
-                    <div class="loading-bar loading-2"></div>
-                    <div class="loading-bar loading-3"></div>
-                  </div>
-                {:else}
-                  <!-- Simple Mode Content -->
-                  <div class="hero-bg-elements">
-                    <div class="hero-circle hero-circle-1 animate-liquid-float"></div>
-                    <div class="hero-circle hero-circle-2 animate-liquid-float"></div>
-                  </div>
-
-                  <div class="hero-content">
-                    <div class="hero-header">
-                      <h1 class="hero-title">Total Pengeluaran 💸</h1>
-                      {#if currentPeriod}
-                        <div class="text-white/70 text-sm mt-1">
-                          {formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate)}
-                        </div>
-                      {/if}
-                    </div>
-
-                    <div class="hero-amount">
-                      <div class="amount-section-hero">
-                        <div class="amount-display-new">
-                          <span class="main-amount-large">{formatRupiah(totalSpent)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="mt-6 p-4 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
-                      <div class="flex items-center gap-3 mb-3">
-                        <span class="text-3xl">💡</span>
-                        <div>
-                          <div class="text-white font-semibold text-lg">Mau tracking lebih detail?</div>
-                          <div class="text-white/70 text-sm">Setup budget untuk track per kategori!</div>
-                        </div>
-                      </div>
-                      <button
-                        on:click={() => goto('/budget')}
-                        class="w-full px-4 py-3 bg-white text-blue-600 font-semibold rounded-lg hover:bg-white/90 transition-all shadow-lg"
-                      >
-                        Setup Budget Sekarang →
-                      </button>
-                    </div>
-                  </div>
-                {/if}
-              </div>
-            {:else}
-              <!-- Full Mode: With Budget Setup -->
-              <div class="hero-budget-card hero-gradient-{budgetStatus} liquid-card">
-                <div class="hero-glass-overlay"></div>
-                {#if loading}
-                  <div class="hero-loading">
-                    <div class="loading-bar loading-1"></div>
-                    <div class="loading-bar loading-2"></div>
-                    <div class="loading-bar loading-3"></div>
-                  </div>
-                {:else}
-                  {@const status = getPlayfulBudgetStatus(percentage)}
-
-                <!-- Enhanced Background Elements -->
-                <div class="hero-bg-elements">
-                  <div class="hero-circle hero-circle-1 animate-liquid-float"></div>
-                  <div class="hero-circle hero-circle-2 animate-liquid-float"></div>
-                  <div class="hero-wave animate-liquid-flow"></div>
-                  <div class="hero-glass-particle hero-particle-1"></div>
-                  <div class="hero-glass-particle hero-particle-2"></div>
-                  <div class="hero-glass-particle hero-particle-3"></div>
-                </div>
-
-                <!-- Hero Content -->
-                <div class="hero-content">
-                  <div class="hero-header">
-                    <h1 class="hero-title">Budget Check! 💰</h1>
-                  </div>
-
-                  <div class="hero-amount">
-                    <div class="amount-section-hero">
-                      <span class="amount-label">SUDAH TERPAKAI</span>
-                      <div class="amount-display-new">
-                        <span class="main-amount-large">{formatRupiah(totalSpent)}</span>
-                        <span class="amount-separator">/</span>
-                        <span class="budget-amount-small">{formatRupiah(totalBudget)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Hero Progress -->
-                  <div class="hero-progress">
-                    <div class="progress-container-hero">
-                      <div class="progress-track">
-                        <div
-                          class="progress-fill-hero progress-{budgetStatus}"
-                          style="width: {percentage}%"
-                        ></div>
-                      </div>
-                      <div class="progress-info">
-                        <span class="progress-percentage">{percentage.toFixed(1)}%</span>
-                        <div class="progress-status status-{status.variant}">
-                          <span class="hero-emoji">{status.emoji}</span>
-                          <span class="hero-message">{status.message}</span>
-                        </div>
-                      </div>
-                      <div class="hero-summary">
-                        <span class="remaining-amount">Tersisa {formatRupiah(remaining)}</span>
-                        <span class="reset-info">Reset dalam {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate()} hari</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              {/if}
-            </div>
-            {/if}
+            <FinancialHeroCard
+              {budgetData}
+              {expenses}
+              {currentPeriodId}
+              {currentPeriod}
+              {loading}
+            />
           </div>
 
 
+
+          <!-- Smart Insights Widget -->
+          <SmartInsightsWidget {currentPeriodId} {budgetData} {expenses} />
 
           <!-- Enhanced Glass Stats Grid -->
           <div class="enhanced-stats-grid">
@@ -642,10 +440,10 @@
                   <span class="stat-label">Hari Ini</span>
                 </div>
                 <div class="stat-amount text-vital">
-                  {todaySpending > 0 ? formatRupiah(todaySpending) : 'Rp 0'}
+                  {metrics.todaySpending > 0 ? formatRupiah(metrics.todaySpending) : 'Rp 0'}
                 </div>
                 <div class="stat-message">
-                  {todaySpending > 0 ? 'Ada aktivitas! 💸' : 'Zero spending! 😎'}
+                  {metrics.todaySpending > 0 ? 'Ada aktivitas! 💸' : 'Zero spending! 😎'}
                 </div>
               </div>
             </div>
@@ -661,10 +459,10 @@
                   <span class="stat-label">Progress</span>
                 </div>
                 <div class="stat-amount text-vital">
-                  {percentage.toFixed(0)}%
+                  {metrics.percentage.toFixed(0)}%
                 </div>
                 <div class="stat-message">
-                  {percentage > 50 ? 'Halfway there! 🏃‍♂️' : 'Good start! 👌'}
+                  {metrics.percentage > 50 ? 'Halfway there! 🏃‍♂️' : 'Good start! 👌'}
                 </div>
               </div>
             </div>
@@ -704,7 +502,7 @@
             {:else}
               <div class="transactions-list">
                 {#each recentTransactions as transaction, index}
-                  {@const transactionDate = transaction.date?.toDate ? transaction.date.toDate() : new Date(transaction.date)}
+                  {@const transactionDate = timestampToDate(transaction.date)}
                   <div class="transaction-item">
                     <div class="transaction-icon">
                       {getPlayfulCategoryIcon(transaction.category)}
@@ -817,13 +615,15 @@
           <button
             class="add-expense-button"
             on:click={() => goto('/add-expense')}
+            type="button"
             aria-label="Tambah pengeluaran baru"
+            title="Tambah Expense"
           >
             <div class="button-content">
-              <span class="add-icon">+</span>
+              <span class="add-icon" aria-hidden="true">+</span>
               <span class="button-text">Tambah Expense</span>
             </div>
-            <div class="button-glow"></div>
+            <div class="button-glow" aria-hidden="true"></div>
           </button>
         </div>
 
@@ -899,7 +699,7 @@
     .dashboard-grid {
       grid-template-columns: 1fr;
       gap: 12px;
-      padding: 12px;
+      padding: 12px 16px;
     }
   }
 
@@ -929,7 +729,7 @@
 
   /* Header Section */
   .dashboard-header {
-    padding: 20px;
+    padding: 20px 0;
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -941,6 +741,7 @@
   .header-content {
     max-width: 1200px;
     margin: 0 auto;
+    padding: 0 20px;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -1016,44 +817,6 @@
   .period-arrow {
     margin-left: auto;
     color: #6b7280;
-  }
-
-  /* Settings Quick Link */
-  .settings-quick-link {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 48px;
-    height: 48px;
-    margin-top: 32px; /* Align with period-card */
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(240, 248, 255, 0.4) 100%);
-    backdrop-filter: blur(15px);
-    border: 2px solid rgba(6, 182, 212, 0.2);
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    flex-shrink: 0;
-  }
-
-  .settings-quick-link:hover {
-    border-color: rgba(6, 182, 212, 0.5);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(6, 182, 212, 0.15);
-  }
-
-  .settings-quick-link:active {
-    transform: translateY(0);
-  }
-
-  .settings-icon {
-    font-size: 20px;
-    filter: grayscale(0.2);
-    transition: all 0.3s ease;
-  }
-
-  .settings-quick-link:hover .settings-icon {
-    filter: grayscale(0);
-    transform: rotate(90deg);
   }
 
   /* HERO CARD - The Star of the Show! */
@@ -1863,18 +1626,27 @@
   .view-all-button {
     width: 100%;
     padding: 12px;
-    background: rgba(6, 182, 212, 0.1);
-    border: 1px solid rgba(6, 182, 212, 0.2);
+    background: linear-gradient(135deg,
+      rgba(0, 191, 255, 0.55) 0%,
+      rgba(30, 144, 255, 0.65) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 12px;
-    color: #0891B2;
+    color: white;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     margin-top: 16px;
+    box-shadow: 0 4px 16px rgba(0, 191, 255, 0.12);
+    backdrop-filter: blur(10px);
   }
 
   .view-all-button:hover {
-    background: rgba(6, 182, 212, 0.2);
+    background: linear-gradient(135deg,
+      rgba(0, 191, 255, 0.7) 0%,
+      rgba(30, 144, 255, 0.8) 100%);
+    box-shadow: 0 8px 24px rgba(0, 191, 255, 0.18);
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.4);
   }
 
   /* Loading States */
@@ -2093,10 +1865,11 @@
   /* Mobile Enhanced Background Accents */
   @media (max-width: 768px) {
     .dashboard-header {
-      padding: 1rem 1rem 0.5rem 1rem;
+      padding: 1rem 0 0.5rem 0;
     }
 
     .header-content {
+      padding: 0 1rem;
       gap: 0.75rem;
     }
 
@@ -2183,7 +1956,11 @@
 
     /* Mobile title styling */
     .dashboard-header {
-      padding: 16px 16px 12px 16px;
+      padding: 16px 0 12px 0;
+    }
+
+    .header-content {
+      padding: 0 16px;
     }
 
     .page-title-section {

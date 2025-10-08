@@ -60,59 +60,14 @@
     expenseActions.setLoading(true);
 
     // TEMPORARY: Load dummy data for development
-    setTimeout(() => {
-      const mockExpenses = loadDummyExpenses();
-      expenseActions.setExpenses(mockExpenses);
+    setTimeout(async () => {
+      const { generateDummyExpenses } = await import('$lib/utils/dummyData');
+      // This will use cached/store data if available
+      generateDummyExpenses(25);
       expenseActions.setLoading(false);
+
+      console.log('📊 Dummy expenses loaded for Expenses page (using shared store)');
     }, 800);
-  }
-
-  function loadDummyExpenses() {
-    // Consistent dummy data matching Dashboard and Budget pages
-    const dummyCategories = [
-      { id: 'food', name: 'Makanan', emoji: '🍽️', budget: 2000000, spent: 1450000 },
-      { id: 'transport', name: 'Transport', emoji: '🚗', budget: 1000000, spent: 650000 },
-      { id: 'shopping', name: 'Belanja', emoji: '🛍️', budget: 1500000, spent: 1890000 },
-      { id: 'entertainment', name: 'Hiburan', emoji: '🎬', budget: 800000, spent: 520000 },
-      { id: 'utilities', name: 'Tagihan', emoji: '💡', budget: 600000, spent: 580000 },
-      { id: 'savings', name: 'Tabungan', emoji: '💰', budget: 3000000, spent: 2500000 }
-    ];
-
-    const today = new Date();
-    const expenses: any[] = [];
-
-    const descriptions: Record<string, string[]> = {
-      'food': ['Lunch di warung', 'Coffee shop', 'Belanja groceries', 'Makan malam'],
-      'transport': ['Grab ride', 'Isi bensin', 'Parkir', 'Tol'],
-      'shopping': ['Beli baju', 'Elektronik', 'Beli buku', 'Peralatan rumah'],
-      'entertainment': ['Nonton bioskop', 'Konser', 'Game', 'Netflix'],
-      'utilities': ['Listrik', 'Air', 'Internet', 'Pulsa'],
-      'savings': ['Transfer tabungan', 'Investasi', 'Dana darurat', 'Deposito']
-    };
-
-    // Generate 25 expenses spread over the month
-    for (let i = 0; i < 25; i++) {
-      const categoryIndex = Math.floor(Math.random() * dummyCategories.length);
-      const category = dummyCategories[categoryIndex];
-      const daysAgo = Math.floor(Math.random() * 30);
-      const date = new Date(today);
-      date.setDate(date.getDate() - daysAgo);
-
-      const categoryDescriptions = descriptions[category.id] || ['Pengeluaran'];
-      const description = categoryDescriptions[Math.floor(Math.random() * categoryDescriptions.length)];
-
-      expenses.push({
-        id: `dummy_${i}`,
-        amount: Math.floor(Math.random() * 150000) + 20000,
-        category: category.id.toUpperCase(),
-        description,
-        date,
-        userId: 'dummy_user'
-      });
-    }
-
-    console.log('📊 Dummy expenses loaded for Expenses page');
-    return expenses.sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 
   async function loadCategories() {
