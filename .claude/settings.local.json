@@ -88,7 +88,8 @@
       "Bash(npm uninstall:*)",
       "Bash(npx svelte-check:*)",
       "Bash(netstat:*)",
-      "Bash(timeout 5 cat:*)"
+      "Bash(timeout 5 cat:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

@@ -705,45 +705,6 @@
       </div>
     </div>
 
-    <!-- Budget Insights -->
-    <div class="budget-insights glass-card">
-      <h3 class="section-title">Budget Insights</h3>
-
-      {#if $budgetHealth.percentage >= 90}
-        <div class="insight-item warning">
-          <span class="insight-icon">⚠️</span>
-          <div class="insight-content">
-            <h4>Budget Alert</h4>
-            <p>You've used {$budgetHealth.percentage}% of your budget. Consider monitoring your spending.</p>
-          </div>
-        </div>
-      {/if}
-
-      {#if categories.length > 0}
-        <div class="insight-item">
-          <span class="insight-icon">📊</span>
-          <div class="insight-content">
-            <h4>Category Summary</h4>
-            <p>You have {categories.length} active categories with an average allocation of {formatCurrency($totalBudget / categories.length)}.</p>
-          </div>
-        </div>
-      {/if}
-
-      <div class="insight-actions">
-        <button class="insight-btn" on:click={() => showEditTotalModal = true}>
-          <span class="btn-icon">✏️</span>
-          Edit Total Budget
-        </button>
-        <button class="insight-btn">
-          <span class="btn-icon">📈</span>
-          View Trends
-        </button>
-        <button class="insight-btn">
-          <span class="btn-icon">⚡</span>
-          Optimize Budget
-        </button>
-      </div>
-    </div>
   {/if}
   </div>
 </div>
@@ -1790,70 +1751,6 @@
     margin-top: 0.5rem;
   }
 
-  /* Budget Insights Styles */
-  .budget-insights {
-    padding: 1.5rem;
-  }
-
-  .insight-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 1rem;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    margin-bottom: 1rem;
-  }
-
-  .insight-item.warning {
-    background: rgba(255, 152, 0, 0.1);
-    border: 1px solid rgba(255, 152, 0, 0.2);
-  }
-
-  .insight-icon {
-    font-size: 1.2rem;
-    flex-shrink: 0;
-  }
-
-  .insight-content h4 {
-    color: #1e293b;
-    margin: 0 0 0.5rem 0;
-    font-size: 1rem;
-  }
-
-  .insight-content p {
-    color: #64748b;
-    margin: 0;
-    font-size: 0.9rem;
-    line-height: 1.4;
-  }
-
-  .insight-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 1rem;
-  }
-
-  .insight-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #1e293b;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-  }
-
-  .insight-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-1px);
-  }
 
   .btn-secondary, .btn-primary {
     padding: 0.75rem 1.5rem;
@@ -1896,10 +1793,8 @@
   /* Enhanced focus states for accessibility */
   .period-selector:focus,
   .add-category-btn:focus,
-  .package-card:focus,
   .btn-secondary:focus,
-  .btn-primary:focus,
-  .insight-btn:focus {
+  .btn-primary:focus {
     outline: 2px solid var(--primary-accent);
     outline-offset: 2px;
   }

@@ -54,17 +54,34 @@
     }
   }).length;
 
-  // Calculate daily spending recommendation
-  $: dailyRecommendation = calculateDailyRecommendation();
+  // Calculate daily spending recommendation - made fully reactive
+  $: dailyRecommendation = (() => {
+    console.log('💡 Calculating daily recommendation:', {
+      hasBudget,
+      daysRemaining,
+      totalBudget,
+      totalSpent,
+      currentPeriod: currentPeriod ? {
+        start: currentPeriod.startDate,
+        end: currentPeriod.endDate
+      } : null
+    });
 
-  function calculateDailyRecommendation(): number {
-    if (!hasBudget || daysRemaining <= 0) return 0;
+    if (!hasBudget || daysRemaining <= 0) {
+      console.log('❌ Cannot calculate: hasBudget=', hasBudget, 'daysRemaining=', daysRemaining);
+      return 0;
+    }
 
     const remainingBudget = totalBudget - totalSpent;
-    if (remainingBudget <= 0) return 0;
+    if (remainingBudget <= 0) {
+      console.log('❌ No remaining budget:', remainingBudget);
+      return 0;
+    }
 
-    return Math.round(remainingBudget / daysRemaining);
-  }
+    const recommendation = Math.round(remainingBudget / daysRemaining);
+    console.log('✅ Daily recommendation:', recommendation);
+    return recommendation;
+  })();
 
   function formatShortRupiah(amount: number): string {
     if (amount >= 1000000) {
@@ -109,6 +126,16 @@
 {:else if !hasBudget}
   <!-- Simple Mode -->
   <div class="hero-card simple-card" style="background: {getGradient()}">
+    <!-- Enhanced Background Elements -->
+    <div class="hero-bg-elements">
+      <div class="hero-circle hero-circle-1 animate-liquid-float"></div>
+      <div class="hero-circle hero-circle-2 animate-liquid-float"></div>
+      <div class="hero-wave animate-liquid-flow"></div>
+      <div class="hero-glass-particle hero-particle-1"></div>
+      <div class="hero-glass-particle hero-particle-2"></div>
+      <div class="hero-glass-particle hero-particle-3"></div>
+    </div>
+
     <h2 class="title">Total Pengeluaran 💸</h2>
     <div class="period">{periodDisplay}</div>
     <div class="amount-big">{formatRupiah(totalSpent)}</div>
@@ -126,6 +153,16 @@
 {:else}
   <!-- Full Mode -->
   <div class="hero-card full-card">
+    <!-- Enhanced Background Elements -->
+    <div class="hero-bg-elements">
+      <div class="hero-circle hero-circle-1 animate-liquid-float"></div>
+      <div class="hero-circle hero-circle-2 animate-liquid-float"></div>
+      <div class="hero-wave animate-liquid-flow"></div>
+      <div class="hero-glass-particle hero-particle-1"></div>
+      <div class="hero-glass-particle hero-particle-2"></div>
+      <div class="hero-glass-particle hero-particle-3"></div>
+    </div>
+
     <div class="hero-header">
       <h2 class="title">💰 Financial Pulse</h2>
       <div class="period">{periodDisplay}</div>
@@ -212,21 +249,28 @@
 {/if}
 
 <style>
+  /* ===== HERO GLASSMORPHISM - MATCHING EXPENSES & BUDGET PAGES ===== */
   .hero-card {
     position: relative;
-    padding: 32px 28px;
     border-radius: 16px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(240, 248, 255, 0.5));
-    backdrop-filter: blur(30px) saturate(1.8);
-    -webkit-backdrop-filter: blur(30px) saturate(1.8);
-    border: 2px solid rgba(255, 255, 255, 0.4);
+    padding: 36px;
+    overflow: hidden;
+    transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    cursor: pointer;
+    min-height: 320px;
+    /* Hero glassmorphism from design system */
+    background: linear-gradient(135deg,
+      rgba(0, 191, 255, 0.55) 0%,
+      rgba(30, 144, 255, 0.65) 50%,
+      rgba(0, 123, 255, 0.7) 100%);
+    backdrop-filter: blur(30px) saturate(2);
+    -webkit-backdrop-filter: blur(30px) saturate(2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     box-shadow:
       0 8px 25px rgba(0, 191, 255, 0.08),
       0 4px 12px rgba(0, 191, 255, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.5);
-    min-height: 280px;
-    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    overflow: hidden;
+      0 2px 6px rgba(30, 144, 255, 0.15),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
   }
 
   .hero-card::before {
@@ -237,26 +281,128 @@
     right: 0;
     bottom: 0;
     background: linear-gradient(135deg,
-      rgba(0, 191, 255, 0.03) 0%,
-      rgba(30, 144, 255, 0.02) 50%,
-      rgba(0, 123, 255, 0.025) 100%);
-    border-radius: 16px;
+      rgba(255, 255, 255, 0.2) 0%,
+      transparent 40%,
+      transparent 60%,
+      rgba(6, 182, 212, 0.1) 100%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
     pointer-events: none;
     z-index: 0;
   }
 
   .hero-card > * {
     position: relative;
-    z-index: 1;
+    z-index: 2;
   }
 
   .hero-card:hover {
-    transform: translateY(-4px);
+    transform: translateY(-12px) scale(1.02);
     box-shadow:
-      0 12px 35px rgba(0, 191, 255, 0.12),
-      0 6px 16px rgba(0, 191, 255, 0.15),
+      0 20px 40px rgba(0, 191, 255, 0.12),
+      0 10px 20px rgba(0, 191, 255, 0.15),
+      0 4px 8px rgba(30, 144, 255, 0.18),
       inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    border-color: rgba(0, 191, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(40px) saturate(2.2);
+    -webkit-backdrop-filter: blur(40px) saturate(2.2);
+  }
+
+  .hero-card:hover::before {
+    opacity: 1;
+  }
+
+  /* Enhanced Hero Background Elements */
+  .hero-bg-elements {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .hero-circle {
+    position: absolute;
+    border-radius: 50%;
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.2) 0%,
+      rgba(255, 255, 255, 0.05) 100%);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .hero-circle-1 {
+    width: 140px;
+    height: 140px;
+    top: -70px;
+    right: -70px;
+  }
+
+  .hero-circle-2 {
+    width: 100px;
+    height: 100px;
+    bottom: -50px;
+    left: -50px;
+  }
+
+  .hero-wave {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.15) 0%,
+      rgba(255, 255, 255, 0.05) 100%);
+    border-radius: 50% 50% 0 0;
+    backdrop-filter: blur(15px);
+  }
+
+  .hero-glass-particle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: radial-gradient(circle,
+      rgba(255, 255, 255, 0.8) 0%,
+      rgba(6, 182, 212, 0.4) 50%,
+      transparent 100%);
+    border-radius: 50%;
+    animation: particle-float 8s ease-in-out infinite;
+  }
+
+  .hero-particle-1 {
+    top: 25%;
+    left: 20%;
+    animation-delay: 0s;
+  }
+
+  .hero-particle-2 {
+    top: 60%;
+    right: 25%;
+    animation-delay: -3s;
+  }
+
+  .hero-particle-3 {
+    bottom: 30%;
+    left: 60%;
+    animation-delay: -6s;
+  }
+
+  @keyframes particle-float {
+    0%, 100% {
+      transform: translateY(0px) scale(1);
+      opacity: 0.6;
+    }
+    33% {
+      transform: translateY(-15px) scale(1.2);
+      opacity: 1;
+    }
+    66% {
+      transform: translateY(10px) scale(0.8);
+      opacity: 0.4;
+    }
   }
 
   .loading-card {
@@ -288,25 +434,36 @@
     color: white;
   }
 
+  .full-card {
+    /* Full mode has blue gradient background */
+    color: white;
+  }
+
   .title {
     font-size: 24px;
     font-weight: 800;
     margin: 0 0 8px 0;
-    background: linear-gradient(135deg, #1f2937 0%, #0891B2 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 2px 4px rgba(8, 145, 178, 0.1));
+    letter-spacing: -0.02em;
+  }
+
+  /* White text for cards with blue gradient background */
+  .simple-card .title,
+  .full-card .title {
+    color: white;
+    background: none;
+    -webkit-text-fill-color: white;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
   }
 
   .period {
     font-size: 14px;
-    color: #6b7280;
     margin-bottom: 24px;
   }
 
-  .simple-card .period {
-    color: rgba(255, 255, 255, 0.7);
+  .simple-card .period,
+  .full-card .period {
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 600;
   }
 
   .amount-big {
@@ -368,40 +525,42 @@
 
   .metric-box {
     padding: 20px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(240, 248, 255, 0.6));
+    background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    box-shadow: 0 4px 12px rgba(0, 191, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     transition: all 0.3s ease;
   }
 
   .metric-box:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 191, 255, 0.08);
-    background: linear-gradient(135deg, rgba(240, 248, 255, 0.7), rgba(248, 252, 255, 0.8));
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
   }
 
   .metric-label {
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.8);
     margin-bottom: 8px;
   }
 
   .metric-value {
     font-size: 24px;
     font-weight: 800;
-    color: #0891B2;
+    color: white;
     line-height: 1.1;
     margin-bottom: 8px;
   }
 
   .metric-sub {
     font-size: 12px;
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
   }
 
   .hero-header {
@@ -410,16 +569,17 @@
 
   .velocity-section {
     padding: 20px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(240, 248, 255, 0.5));
+    background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 4px 12px rgba(0, 191, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     margin-bottom: 16px;
   }
 
   .velocity-icon { font-size: 18px; }
-  .velocity-title { font-size: 14px; font-weight: 700; color: #1f2937; }
+  .velocity-title { font-size: 14px; font-weight: 700; color: white; }
 
   .progress-compare {
     display: flex;
@@ -445,7 +605,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.7);
   }
 
   .progress-percent {
@@ -454,14 +614,14 @@
     gap: 8px;
     font-size: 12px;
     font-weight: 700;
-    color: #1f2937;
+    color: white;
   }
 
   .days-info {
     font-size: 11px;
     font-weight: 600;
-    color: #6b7280;
-    background: rgba(6, 182, 212, 0.08);
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.15);
     padding: 2px 8px;
     border-radius: 6px;
     white-space: nowrap;
@@ -470,8 +630,8 @@
   .spending-info {
     font-size: 11px;
     font-weight: 600;
-    color: #6b7280;
-    background: rgba(6, 182, 212, 0.08);
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.15);
     padding: 2px 8px;
     border-radius: 6px;
     white-space: nowrap;
@@ -480,19 +640,19 @@
   .percent-value {
     font-size: 12px;
     font-weight: 700;
-    color: #1f2937;
+    color: white;
   }
 
   .progress-track {
     height: 8px;
-    background: rgba(6, 182, 212, 0.1);
+    background: rgba(255, 255, 255, 0.25);
     border-radius: 4px;
     overflow: hidden;
   }
 
   .progress-fill-time {
     height: 100%;
-    background: linear-gradient(90deg, #9ca3af, #6b7280);
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
     transition: width 0.8s ease;
   }
 
@@ -502,15 +662,15 @@
   }
 
   .progress-fill-spending.on-track {
-    background: linear-gradient(90deg, #10b981, #059669);
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.8));
   }
 
   .progress-fill-spending.slow {
-    background: linear-gradient(90deg, #06B6D4, #0891B2);
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.9), rgba(8, 145, 178, 0.8));
   }
 
   .progress-fill-spending.too-fast {
-    background: linear-gradient(90deg, #ef4444, #dc2626);
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.8));
   }
 
   .velocity-metrics {
@@ -518,7 +678,7 @@
     flex-direction: column;
     gap: 8px;
     padding-top: 8px;
-    border-top: 1px solid rgba(6, 182, 212, 0.1);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
   }
 
   .velocity-metric {
@@ -526,7 +686,7 @@
     align-items: center;
     gap: 8px;
     font-size: 11px;
-    color: #1f2937;
+    color: rgba(255, 255, 255, 0.9);
   }
 
   .velocity-metric .metric-icon {
@@ -579,23 +739,29 @@
   }
 
   /* Mobile Responsive */
-  @media (max-width: 640px) {
+  @media (max-width: 768px) {
     .hero-card {
-      padding: 24px 20px;
-      min-height: 240px;
+      padding: 24px;
+      min-height: 280px;
     }
 
     .title {
       font-size: 20px;
     }
 
+    .period {
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
     .metrics {
       grid-template-columns: 1fr 1fr;
       gap: 10px;
+      margin-bottom: 20px;
     }
 
     .metric-box {
-      padding: 14px 12px;
+      padding: 16px 14px;
     }
 
     .metric-label {
@@ -604,7 +770,7 @@
     }
 
     .metric-value {
-      font-size: 18px;
+      font-size: 20px;
       margin-bottom: 6px;
     }
 
@@ -614,10 +780,64 @@
 
     .amount-big {
       font-size: 36px;
+      margin: 20px 0;
     }
 
     .velocity-section {
       padding: 16px;
+    }
+
+    .velocity-title {
+      font-size: 13px;
+    }
+
+    .hero-circle-1 {
+      width: 100px;
+      height: 100px;
+      top: -50px;
+      right: -50px;
+    }
+
+    .hero-circle-2 {
+      width: 80px;
+      height: 80px;
+      bottom: -40px;
+      left: -40px;
+    }
+
+    .hero-wave {
+      height: 60px;
+    }
+  }
+
+  @media (max-width: 430px) {
+    .hero-card {
+      padding: 20px;
+      min-height: 260px;
+    }
+
+    .title {
+      font-size: 18px;
+    }
+
+    .period {
+      font-size: 12px;
+    }
+
+    .metrics {
+      gap: 8px;
+    }
+
+    .metric-box {
+      padding: 12px 10px;
+    }
+
+    .metric-value {
+      font-size: 18px;
+    }
+
+    .amount-big {
+      font-size: 32px;
     }
   }
 </style>

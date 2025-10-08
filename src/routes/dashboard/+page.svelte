@@ -162,6 +162,16 @@
     const year = today.getFullYear();
     const month = today.getMonth() + 1;
     currentPeriodId = `${year}-${String(month).padStart(2, '0')}`;
+
+    // Generate period object using default monthly period (1st - end of month)
+    const config: PeriodGeneratorConfig = {
+      resetDate: 1,  // Default to 1st of month
+      resetType: 'fixed'
+    };
+    const periods = generatePeriods(config, 3);
+    currentPeriod = periods.find(p => p.isActive) || periods[0];
+
+    console.log('📅 Using default monthly period:', formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate));
   }
 
   async function loadDashboardData() {
@@ -193,10 +203,29 @@
     // Calculate REAL total from expenses
     const realTotalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
 
-    // Load budget data with REAL spent amount
+    // Calculate spending per category from actual expenses
+    const categorySpending: Record<string, number> = {};
+    expenses.forEach((expense: any) => {
+      const categoryId = expense.category.toLowerCase();
+      categorySpending[categoryId] = (categorySpending[categoryId] || 0) + expense.amount;
+    });
+
+    // Load budget data with REAL spent amount per category
     const budgetDummyData = getDummyBudgetData();
+
+    // Update categories with REAL spending from expenses
+    const categoriesWithSpending = Object.fromEntries(
+      Object.entries(budgetDummyData.categories).map(([catId, catData]: [string, any]) => [
+        catId,
+        {
+          budget: catData.budget,
+          spent: categorySpending[catId] || 0  // Use real spending from expenses
+        }
+      ])
+    );
+
     budgetData = {
-      categories: budgetDummyData.categories,
+      categories: categoriesWithSpending,
       totalBudget: budgetDummyData.totalBudget,
       totalSpent: realTotalSpent, // Use real calculated total
       month: currentPeriodId
@@ -211,6 +240,7 @@
 
     console.log('📊 Dummy data loaded for Dashboard (using shared store)');
     console.log('💰 Real total spent:', realTotalSpent);
+    console.log('📊 Category spending:', categorySpending);
     console.log('✅ Budget setup detected:', hasBudgetSetup);
   }
 
