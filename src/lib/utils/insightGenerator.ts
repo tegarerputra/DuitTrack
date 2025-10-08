@@ -12,13 +12,28 @@ import {
   formatRupiah
 } from './insightCalculators';
 import { formatCategoryName } from './formatters';
+import { generateContextualInsights, generateFallbackInsights } from './insightGenerator-extended';
 
 /**
  * Generate top 3 insights based on current financial data
+ * Now with fallback insights for empty states!
  */
 export function generateInsights(context: InsightContext): Insight[] {
   const insights: Insight[] = [];
 
+  // Check if we need fallback insights (no budget or no expenses)
+  const hasExpenses = context.expenses.length > 0;
+  const hasBudget = context.totalBudget > 0;
+
+  // If no data or minimal data, return fallback insights
+  if (!hasBudget || !hasExpenses || context.expenses.length < 3) {
+    const fallbackInsights = generateFallbackInsights(context);
+    if (fallbackInsights.length > 0) {
+      return fallbackInsights.slice(0, 3);
+    }
+  }
+
+  // Normal flow - generate regular insights
   // 1. Check spending velocity (CRITICAL)
   const velocityInsights = generateVelocityInsights(context);
   insights.push(...velocityInsights);
@@ -41,9 +56,15 @@ export function generateInsights(context: InsightContext): Insight[] {
     insights.push(...comparisonInsights);
   }
 
-  // 6. Contextual recommendations (MEDIUM-HIGH)
-  const recommendationInsights = generateRecommendationInsights(context);
-  insights.push(...recommendationInsights);
+  // 6. NEW: Contextual & predictive insights (MEDIUM-HIGH)
+  const contextualInsights = generateContextualInsights(context);
+  insights.push(...contextualInsights);
+
+  // If we have no insights after all this, provide fallback
+  if (insights.length === 0) {
+    const fallbackInsights = generateFallbackInsights(context);
+    return fallbackInsights.slice(0, 3);
+  }
 
   // Sort by priority (highest first) and return top 3
   return insights

@@ -85,13 +85,6 @@
         <div class="loading-mini"></div>
       </div>
     </div>
-  {:else if !topInsight}
-    <!-- Empty State -->
-    <div class="insights-empty">
-      <div class="empty-icon">✨</div>
-      <p class="empty-title">No insights available</p>
-      <p class="empty-subtitle">Start tracking expenses to get insights! 📊</p>
-    </div>
   {:else}
     <!-- Top Insight (Main Card) -->
     <div

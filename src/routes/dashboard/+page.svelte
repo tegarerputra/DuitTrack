@@ -38,7 +38,6 @@
   import FintechCard from '$lib/components/ui/FintechCard.svelte';
   import FintechButton from '$lib/components/ui/FintechButton.svelte';
   import FintechProgress from '$lib/components/ui/FintechProgress.svelte';
-  import SmartInsightsWidget from '$lib/components/insights/SmartInsightsWidget.svelte';
   import FinancialHeroCard from '$lib/components/dashboard/FinancialHeroCard_Final.svelte';
 
   // Dashboard state
@@ -424,49 +423,6 @@
 
 
 
-          <!-- Smart Insights Widget -->
-          <SmartInsightsWidget {currentPeriodId} {budgetData} {expenses} />
-
-          <!-- Enhanced Glass Stats Grid -->
-          <div class="enhanced-stats-grid">
-            <!-- Today's Spending -->
-            <div class="glass-stat-card liquid-card liquid-interactive">
-              <div class="glass-card-overlay"></div>
-              <div class="glass-card-content">
-                <div class="stat-header">
-                  <div class="stat-icon-container">
-                    <span class="stat-icon">📅</span>
-                  </div>
-                  <span class="stat-label">Hari Ini</span>
-                </div>
-                <div class="stat-amount text-vital">
-                  {metrics.todaySpending > 0 ? formatRupiah(metrics.todaySpending) : 'Rp 0'}
-                </div>
-                <div class="stat-message">
-                  {metrics.todaySpending > 0 ? 'Ada aktivitas! 💸' : 'Zero spending! 😎'}
-                </div>
-              </div>
-            </div>
-
-            <!-- Monthly Progress -->
-            <div class="glass-stat-card liquid-card liquid-interactive">
-              <div class="glass-card-overlay"></div>
-              <div class="glass-card-content">
-                <div class="stat-header">
-                  <div class="stat-icon-container">
-                    <span class="stat-icon">📊</span>
-                  </div>
-                  <span class="stat-label">Progress</span>
-                </div>
-                <div class="stat-amount text-vital">
-                  {metrics.percentage.toFixed(0)}%
-                </div>
-                <div class="stat-message">
-                  {metrics.percentage > 50 ? 'Halfway there! 🏃‍♂️' : 'Good start! 👌'}
-                </div>
-              </div>
-            </div>
-          </div>
 
           <!-- Recent Transactions -->
           <div class="transactions-card liquid-card">

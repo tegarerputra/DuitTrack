@@ -75,6 +75,15 @@
     return formatRupiah(amount);
   }
 
+  function formatCompactRupiah(amount: number): string {
+    if (amount >= 1000000) {
+      return `${(amount / 1000000).toFixed(1)}jt`;
+    } else if (amount >= 1000) {
+      return `${Math.round(amount / 1000)}k`;
+    }
+    return `${Math.round(amount)}`;
+  }
+
   function getGradient() {
     if (percentage >= 90) return 'linear-gradient(135deg, rgba(239, 68, 68, 0.55), rgba(220, 38, 38, 0.65))';
     if (percentage >= 75) return 'linear-gradient(135deg, rgba(251, 191, 36, 0.55), rgba(245, 158, 11, 0.65))';
@@ -154,7 +163,10 @@
           <div class="progress-item">
             <div class="progress-item-header">
               <span class="progress-label">Time</span>
-              <span class="progress-percent">{timeProgress.toFixed(0)}%</span>
+              <span class="progress-percent">
+                <span class="days-info">{daysPassed}/{totalDays} days</span>
+                <span class="percent-value">{timeProgress.toFixed(0)}%</span>
+              </span>
             </div>
             <div class="progress-track">
               <div class="progress-fill-time" style="width: {Math.min(100, timeProgress)}%"></div>
@@ -164,7 +176,10 @@
           <div class="progress-item">
             <div class="progress-item-header">
               <span class="progress-label">Spending</span>
-              <span class="progress-percent">{(velocity.spentProgress * 100).toFixed(0)}%</span>
+              <span class="progress-percent">
+                <span class="spending-info">{formatCompactRupiah(totalSpent)}/{formatCompactRupiah(totalBudget)}</span>
+                <span class="percent-value">{(velocity.spentProgress * 100).toFixed(0)}%</span>
+              </span>
             </div>
             <div class="progress-track">
               <div
@@ -183,11 +198,11 @@
           <div class="velocity-metrics">
             <div class="velocity-metric">
               <span class="metric-icon">⚡</span>
-              <span class="metric-text">Rp {formatRupiah(velocity.dailyBurnRate)}/day avg (Target: Rp {formatRupiah(velocity.dailyTarget)}/day)</span>
+              <span class="metric-text">{formatRupiah(velocity.dailyBurnRate)}/day avg (Target: {formatRupiah(velocity.dailyTarget)}/day)</span>
             </div>
             <div class="velocity-metric">
               <span class="metric-icon">📈</span>
-              <span class="metric-text">Projected: Rp {formatRupiah(velocity.projectedTotal)} ({((velocity.projectedTotal / totalBudget) * 100).toFixed(0)}% of budget)</span>
+              <span class="metric-text">Projected: {formatRupiah(velocity.projectedTotal)} ({((velocity.projectedTotal / totalBudget) * 100).toFixed(0)}% of budget)</span>
             </div>
           </div>
         {/if}
@@ -434,6 +449,35 @@
   }
 
   .progress-percent {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .days-info {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    background: rgba(6, 182, 212, 0.08);
+    padding: 2px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .spending-info {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    background: rgba(6, 182, 212, 0.08);
+    padding: 2px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .percent-value {
     font-size: 12px;
     font-weight: 700;
     color: #1f2937;
