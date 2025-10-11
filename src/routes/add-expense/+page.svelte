@@ -17,8 +17,14 @@
   let showSuccessState = false;
   let dailyWarnings = new Map();
   let categories: any[] = [];
+  let isLoadingBudget = false;
 
-  // Form data stores
+  // Helper function to get current date
+  function getCurrentDate(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  // Form data stores - Initialize with today's date
   const formData = writable({
     amount: '',
     category: 'OTHER',
@@ -53,10 +59,17 @@
     }
   );
 
-  const hasCategories = derived(
-    () => categories,
-    ($categories) => $categories && $categories.length > 0 && !$categories.every(cat => cat.disabled)
-  );
+  // Reactive variable for categories check
+  $: hasCategories = categories && categories.length > 0 && !categories.every(cat => cat.disabled);
+
+  // Reactive subscription to budget store - automatically update categories when budget changes
+  $: if ($budgetStore && $budgetStore.categories) {
+    categories = Object.entries($budgetStore.categories).map(([key, data]: [string, any]) => ({
+      value: key.toUpperCase(),
+      label: formatCategoryName(key),
+      disabled: false
+    }));
+  }
 
   // Component initialization
   onMount(async () => {
@@ -85,27 +98,12 @@
 
   async function loadCategories() {
     try {
-      // Subscribe to budget store to get categories
-      budgetStore.subscribe(budget => {
-        if (budget && budget.categories) {
-          categories = Object.entries(budget.categories).map(([key, data]: [string, any]) => ({
-            value: key.toUpperCase(),
-            label: formatCategoryName(key),
-            disabled: false
-          }));
-        }
-      });
-
-      // Load budget data
+      // Load budget data - reactive statement will handle updating categories
       await budgetActions.loadBudgetData();
     } catch (error) {
       console.error('Error loading categories:', error);
       categories = [];
     }
-  }
-
-  function getCurrentDate(): string {
-    return new Date().toISOString().split('T')[0];
   }
 
   function formatCurrencyInput(amount: number): string {
@@ -205,6 +203,11 @@
       return;
     }
 
+    // Prevent race condition - don't load if already loading
+    if (isLoadingBudget) {
+      return;
+    }
+
     if (!budgetData) {
       await loadBudgetData();
     }
@@ -217,19 +220,30 @@
   }
 
   async function loadBudgetData() {
+    if (isLoadingBudget) return;
+
     try {
+      isLoadingBudget = true;
+
       if (!dataService) return;
+
+      // Load from budget store
+      await budgetActions.loadBudgetData();
 
       // Get from budget store
       const currentBudget = $budgetStore;
-      if (currentBudget) {
+      if (currentBudget && currentBudget.categories) {
         budgetData = {
           categories: currentBudget.categories
         };
+      } else {
+        budgetData = null;
       }
     } catch (error) {
       console.error('Error loading budget data:', error);
       budgetData = null;
+    } finally {
+      isLoadingBudget = false;
     }
   }
 
@@ -434,10 +448,12 @@
 
 <div class="add-expense-page">
   <div class="page-header">
-    <button class="back-button" on:click={handleCancel}>
-      ← Back
-    </button>
-    <h1 class="page-title">Add Expense</h1>
+    <div class="header-content">
+      <h1 class="page-title">Add Expense</h1>
+      <button class="close-button" on:click={handleCancel} aria-label="Close">
+        ✕
+      </button>
+    </div>
   </div>
 
   <div class="expense-container">
@@ -451,20 +467,15 @@
       <form class="expense-form glass-card" on:submit={handleSubmit}>
         <!-- Input Method Selection -->
         <div class="input-method-section">
-          <div class="method-option active">
+          <button type="button" class="method-tab active">
             <div class="method-icon">✏️</div>
-            <div class="method-info">
-              <h3>Manual Input</h3>
-              <p>Enter expense details manually</p>
-            </div>
-          </div>
-          <div class="method-option disabled">
+            <div class="method-label">Manual Input</div>
+          </button>
+          <button type="button" class="method-tab disabled" disabled>
             <div class="method-icon">📷</div>
-            <div class="method-info">
-              <h3>Invoice OCR</h3>
-              <p>Coming Soon - Scan receipt automatically</p>
-            </div>
-          </div>
+            <div class="method-label">Invoice OCR</div>
+            <span class="coming-soon-badge">Soon</span>
+          </button>
         </div>
 
         <!-- Amount Input -->
@@ -498,9 +509,9 @@
               class:error-state={$errors.category}
               value={$formData.category}
               on:change={handleCategoryChange}
-              disabled={!$hasCategories}
+              disabled={!hasCategories}
             >
-              {#if $hasCategories}
+              {#if hasCategories}
                 <option value="OTHER">Choose category</option>
                 {#each categories as category}
                   {#if !category.disabled}
@@ -526,8 +537,10 @@
             id="expenseDate"
             class="glass-input date-input"
             class:error-state={$errors.date}
-            value={$formData.date}
+            bind:value={$formData.date}
             on:change={handleDateChange}
+            on:click={(e) => e.target.showPicker?.()}
+            on:focus={(e) => e.target.showPicker?.()}
             required
           />
           {#if $errors.date}
@@ -597,13 +610,13 @@
   .add-expense-page {
     min-height: 100vh;
     position: relative;
-    padding: 1rem;
-    /* Apply glassmorphism background system */
+    padding: 0;
+    /* Enhanced glassmorphism background with stronger accents */
     background:
-      radial-gradient(circle at 20% 80%, rgba(0, 191, 255, 0.04) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(30, 144, 255, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 40% 40%, rgba(0, 123, 255, 0.02) 0%, transparent 40%),
-      linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
+      radial-gradient(circle at 20% 80%, rgba(0, 191, 255, 0.15) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(30, 144, 255, 0.12) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, rgba(0, 123, 255, 0.08) 0%, transparent 40%),
+      linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
     overflow: hidden;
   }
 
@@ -612,66 +625,97 @@
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     background-image:
-      radial-gradient(circle at 25% 25%, rgba(0, 191, 255, 0.03) 0%, transparent 30%),
-      radial-gradient(circle at 75% 75%, rgba(30, 144, 255, 0.02) 0%, transparent 30%),
-      radial-gradient(circle at 50% 10%, rgba(0, 123, 255, 0.025) 0%, transparent 25%);
+      radial-gradient(circle at 25% 25%, rgba(0, 191, 255, 0.18) 0%, transparent 35%),
+      radial-gradient(circle at 75% 75%, rgba(30, 144, 255, 0.15) 0%, transparent 35%),
+      radial-gradient(circle at 50% 10%, rgba(0, 123, 255, 0.12) 0%, transparent 30%);
     animation: float-accent 20s ease-in-out infinite;
     pointer-events: none;
     z-index: 0;
   }
 
+  .add-expense-page::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle,
+      rgba(0, 191, 255, 0.2) 0%,
+      rgba(30, 144, 255, 0.15) 25%,
+      rgba(6, 182, 212, 0.1) 50%,
+      transparent 70%);
+    border-radius: 50%;
+    filter: blur(60px);
+    animation: pulse-glow 8s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
   .page-header {
+    padding: 20px 0;
+    background: transparent;
+    position: relative;
+    z-index: 2;
+    margin-bottom: 20px;
+  }
+
+  .header-content {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 0 1rem;
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    position: relative;
-    z-index: 1;
-  }
-
-  .back-button {
-    /* Apply floating glassmorphism styling */
-    background: linear-gradient(135deg,
-      rgba(0, 191, 255, 0.7) 0%,
-      rgba(30, 144, 255, 0.8) 100%);
-    backdrop-filter: blur(25px) saturate(1.8);
-    -webkit-backdrop-filter: blur(25px) saturate(1.8);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    border-radius: 12px;
-    color: white;
-    box-shadow:
-      0 8px 32px rgba(0, 191, 255, 0.15),
-      inset 0 1px 0 rgba(255, 255, 255, 0.5);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-  }
-
-  .back-button:hover {
-    background: linear-gradient(135deg,
-      rgba(0, 191, 255, 0.85) 0%,
-      rgba(30, 144, 255, 0.9) 100%);
-    transform: translateY(-3px) scale(1.03);
-    box-shadow:
-      0 12px 40px rgba(0, 191, 255, 0.2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    border-color: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(30px) saturate(2);
-    -webkit-backdrop-filter: blur(30px) saturate(2);
+    justify-content: space-between;
   }
 
   .page-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #2d3748;
+    font-size: 28px;
+    font-weight: 700;
+    color: #1f2937;
     margin: 0;
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+    letter-spacing: -0.01em;
+  }
+
+  .close-button {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1.5px solid rgba(203, 213, 225, 0.8);
+    color: #6b7280;
+    font-size: 1.5rem;
+    font-weight: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 0;
+    line-height: 1;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.05),
+      inset 0 1px 2px rgba(255, 255, 255, 0.8);
+  }
+
+  .close-button:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: var(--danger-red);
+    transform: rotate(90deg);
+  }
+
+  .close-button:active {
+    transform: rotate(90deg) scale(0.95);
   }
 
   .expense-container {
     max-width: 500px;
     margin: 0 auto;
+    padding: 0 1rem 2.5rem;
   }
 
   .glass-card {
@@ -693,79 +737,101 @@
   }
 
   .expense-form {
-    padding: 1.5rem;
+    padding: 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1rem;
   }
 
   .input-method-section {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 0.5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
   }
 
-  .method-option {
-    flex: 1;
-    padding: 1rem;
+  .method-tab {
+    position: relative;
+    padding: 0.875rem;
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.2);
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
+    justify-content: center;
+    gap: 0.5rem;
     cursor: pointer;
     transition: all 0.3s ease;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #6b7280;
   }
 
-  .method-option.active {
-    border-color: var(--gold-primary);
-    background: rgba(184, 134, 11, 0.1);
+  .method-tab.active {
+    border-color: #00BFFF;
+    background: rgba(0, 191, 255, 0.1);
+    color: #00BFFF;
+    box-shadow: 0 2px 8px rgba(0, 191, 255, 0.15);
   }
 
-  .method-option.disabled {
+  .method-tab.disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
 
   .method-icon {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
+    line-height: 1;
   }
 
-  .method-info h3 {
-    margin: 0 0 0.25rem 0;
-    font-size: 0.9rem;
+  .method-label {
+    font-size: 0.8rem;
     font-weight: 600;
-    color: #1f2937;
+    text-align: center;
+    line-height: 1.2;
   }
 
-  .method-info p {
-    margin: 0;
-    font-size: 0.75rem;
-    color: #6b7280;
+  .coming-soon-badge {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    background: rgba(251, 191, 36, 0.9);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.125rem 0.375rem;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
   }
 
   .form-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.375rem;
   }
 
   .form-label {
-    font-weight: 500;
+    font-weight: 600;
     color: #4a5568;
-    font-size: 0.95rem;
+    font-size: 0.875rem;
   }
 
   .glass-input {
-    padding: 0.875rem 1rem;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1.5px solid rgba(203, 213, 225, 0.8);
     color: #1f2937;
-    font-size: 1rem;
+    font-size: 0.9375rem;
     transition: all 0.3s ease;
     width: 100%;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.05),
+      inset 0 1px 2px rgba(255, 255, 255, 0.8);
   }
 
   .glass-input::placeholder {
@@ -774,9 +840,12 @@
 
   .glass-input:focus {
     outline: none;
-    border-color: #0891B2;
-    background: rgba(255, 255, 255, 0.5);
-    box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.1);
+    border-color: #00BFFF;
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow:
+      0 0 0 3px rgba(0, 191, 255, 0.15),
+      0 2px 8px rgba(0, 191, 255, 0.1),
+      inset 0 1px 2px rgba(255, 255, 255, 0.9);
   }
 
   .glass-input.error-state {
@@ -802,7 +871,8 @@
   .currency-input {
     padding-left: 2.75rem;
     text-align: right;
-    font-weight: 500;
+    font-weight: 600;
+    color: #0f172a;
   }
 
   .select-wrapper {
@@ -811,13 +881,22 @@
 
   .category-select {
     appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     padding-right: 2.5rem;
     cursor: pointer;
+    background: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
   }
 
   .category-select:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.4);
+  }
+
+  .category-select:focus {
+    background: rgba(255, 255, 255, 0.75);
   }
 
   .select-arrow {
@@ -828,15 +907,28 @@
     color: #6b7280;
     pointer-events: none;
     font-size: 0.8rem;
-    transition: transform 0.3s ease;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
   }
 
   .category-select:focus + .select-arrow {
     transform: translateY(-50%) rotate(180deg);
+    color: #00BFFF;
   }
 
   .date-input {
     font-family: inherit;
+    color: #1f2937;
+  }
+
+  .date-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+  }
+
+  .date-input::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
   }
 
   .field-error {
@@ -863,16 +955,16 @@
 
   .form-actions {
     display: flex;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-top: 0.5rem;
   }
 
   .btn-secondary, .btn-primary {
     flex: 1;
-    padding: 0.875rem 1.5rem;
-    border-radius: 12px;
+    padding: 0.875rem 1.25rem;
+    border-radius: 10px;
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 0.9375rem;
     cursor: pointer;
     transition: all 0.3s ease;
     display: flex;
@@ -883,47 +975,62 @@
   }
 
   .btn-secondary {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1.5px solid rgba(0, 191, 255, 0.3);
+    color: #00BFFF;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.05),
+      inset 0 1px 2px rgba(255, 255, 255, 0.8);
   }
 
   .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(0, 191, 255, 0.5);
+    color: #1E90FF;
+    transform: translateY(-1px);
+    box-shadow:
+      0 2px 6px rgba(0, 191, 255, 0.1),
+      inset 0 1px 2px rgba(255, 255, 255, 0.9);
+  }
+
+  .btn-secondary:active {
+    transform: translateY(0);
   }
 
   .btn-primary {
-    /* Floating glassmorphism for primary action */
+    /* Vibrant cyan gradient matching FintechButton */
     background: linear-gradient(135deg,
-      rgba(0, 191, 255, 0.7) 0%,
-      rgba(30, 144, 255, 0.8) 100%);
-    backdrop-filter: blur(25px) saturate(1.8);
-    -webkit-backdrop-filter: blur(25px) saturate(1.8);
-    border: 1px solid rgba(255, 255, 255, 0.4);
+      #00BFFF 0%,
+      #1E90FF 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
-    box-shadow:
-      0 8px 32px rgba(0, 191, 255, 0.15),
-      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 16px rgba(0, 191, 255, 0.25);
+    position: relative;
+    overflow: hidden;
   }
 
   .btn-primary:hover:not(:disabled) {
     background: linear-gradient(135deg,
-      rgba(0, 191, 255, 0.85) 0%,
-      rgba(30, 144, 255, 0.9) 100%);
-    transform: translateY(-3px) scale(1.03);
-    box-shadow:
-      0 12px 40px rgba(0, 191, 255, 0.2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    border-color: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(30px) saturate(2);
-    -webkit-backdrop-filter: blur(30px) saturate(2);
+      #00A8E8 0%,
+      #1873CC 100%);
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 8px 24px rgba(0, 191, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(-1px) scale(1.01);
   }
 
   .btn-primary:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
+    box-shadow: 0 4px 16px rgba(0, 191, 255, 0.15);
   }
 
   .loading-spinner {
@@ -988,38 +1095,91 @@
   @keyframes float-accent {
     0%, 100% {
       transform: translateY(0px) rotate(0deg);
+      opacity: 1;
     }
     33% {
-      transform: translateY(-10px) rotate(120deg);
+      transform: translateY(-15px) rotate(120deg);
+      opacity: 0.8;
     }
     66% {
-      transform: translateY(5px) rotate(240deg);
+      transform: translateY(10px) rotate(240deg);
+      opacity: 0.9;
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.6;
+    }
+    50% {
+      transform: translate(-50%, -50%) scale(1.1);
+      opacity: 0.8;
     }
   }
 
   /* Mobile responsiveness */
   @media (max-width: 768px) {
-    .add-expense-page {
-      padding: 0.5rem;
+    .page-header {
+      padding: 1rem 0 0.5rem 0;
+      margin-bottom: 0.75rem;
+    }
+
+    .header-content {
+      padding: 0 1rem;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .expense-container {
+      padding: 0 1rem 2rem;
     }
 
     .expense-form {
       padding: 1rem;
-      gap: 1rem;
+      gap: 0.875rem;
+    }
+
+    .input-method-section {
+      margin-bottom: 0.25rem;
+    }
+
+    .method-tab {
+      padding: 0.75rem 0.5rem;
+    }
+
+    .method-icon {
+      font-size: 1.5rem;
+    }
+
+    .method-label {
+      font-size: 0.75rem;
+    }
+
+    .form-group {
+      gap: 0.375rem;
+    }
+
+    .form-label {
+      font-size: 0.8125rem;
+    }
+
+    .glass-input {
+      padding: 0.75rem 0.875rem;
+      font-size: 0.9375rem;
     }
 
     .form-actions {
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.625rem;
+      margin-top: 0.5rem;
     }
 
     .btn-secondary, .btn-primary {
-      padding: 1rem;
-    }
-
-    .input-method-section {
-      flex-direction: column;
-      gap: 0.75rem;
+      padding: 0.875rem;
+      font-size: 0.9375rem;
     }
   }
 </style>

@@ -315,16 +315,40 @@ export const budgetActions = {
     });
   },
 
+  // Update category spending (add expense amount to category)
+  updateCategorySpending: (category: string, amount: number) => {
+    currentBudgetStore.update(budget => {
+      if (!budget || !budget.categories[category]) return budget;
+
+      const updatedCategories = {
+        ...budget.categories,
+        [category]: {
+          ...budget.categories[category],
+          spent: budget.categories[category].spent + amount
+        }
+      };
+
+      const totalSpent = Object.values(updatedCategories)
+        .reduce((sum, cat) => sum + cat.spent, 0);
+
+      return {
+        ...budget,
+        categories: updatedCategories,
+        totalSpent
+      };
+    });
+  },
+
   // Load budget data (temporary mock implementation)
-  loadBudgetData: async (periodId: string) => {
+  loadBudgetData: async (periodId?: string) => {
     budgetLoadingStore.set(true);
     budgetErrorStore.set(null);
 
     // Simulate loading with mock data
     setTimeout(() => {
       const mockBudget: Budget = {
-        id: `budget_${periodId}`,
-        month: periodId,
+        id: `budget_${periodId || getCurrentMonth()}`,
+        month: periodId || getCurrentMonth(),
         categories: {
           food: { budget: 2000000, spent: 1200000 },
           transport: { budget: 1000000, spent: 800000 },

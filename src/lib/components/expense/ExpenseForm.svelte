@@ -25,6 +25,7 @@
   let showSuccessState = false;
   let dailyWarnings = new Map();
   let hasBudgetSetup = false;
+  let isLoadingBudget = false;
 
   // Form data stores
   const formData = writable({
@@ -48,16 +49,9 @@
     data: {}
   });
 
-  // Derived stores
-  const isEditMode = derived(
-    () => editingExpense,
-    ($editingExpense) => !!$editingExpense
-  );
-
-  const hasCategories = derived(
-    () => categories,
-    ($categories) => $categories && $categories.length > 0 && !$categories.every(cat => cat.disabled)
-  );
+  // Reactive variables
+  $: isEditMode = !!editingExpense;
+  $: hasCategories = categories && categories.length > 0 && !categories.every(cat => cat.disabled);
 
   const isFormValid = derived(
     [formData, errors],
@@ -82,13 +76,15 @@
   }
 
   // Watch for editing expense changes
-  $: if (editingExpense && isOpen) {
+  $: if (editingExpense && isOpen && isEditMode) {
     populateEditForm(editingExpense);
   }
 
   // Watch for modal open/close
   $: if (isOpen) {
-    resetForm();
+    if (!isEditMode) {
+      resetForm(); // Only reset for new expenses, not edit mode
+    }
     loadBudgetData();
   } else {
     resetSuccessState();
@@ -262,6 +258,11 @@
       return;
     }
 
+    // Prevent race condition - don't load if already loading
+    if (isLoadingBudget) {
+      return;
+    }
+
     if (!budgetData) {
       await loadBudgetData();
     }
@@ -274,21 +275,29 @@
   }
 
   async function loadBudgetData() {
+    if (isLoadingBudget) return;
+
     try {
+      isLoadingBudget = true;
+
       if (!dataService) return;
 
-      // For now, use mock data - in real implementation, load from DataService
-      budgetData = {
-        categories: {
-          food: { budget: 2000000, spent: 1200000 },
-          transport: { budget: 1000000, spent: 800000 },
-          shopping: { budget: 800000, spent: 300000 },
-          entertainment: { budget: 500000, spent: 450000 }
-        }
-      };
+      // Load from budget store
+      await budgetActions.loadBudgetData();
+
+      const currentBudget = $budgetStore;
+      if (currentBudget && currentBudget.categories) {
+        budgetData = {
+          categories: currentBudget.categories
+        };
+      } else {
+        budgetData = null;
+      }
     } catch (error) {
       console.error('Error loading budget data:', error);
       budgetData = null;
+    } finally {
+      isLoadingBudget = false;
     }
   }
 
@@ -372,7 +381,7 @@
       };
 
       let expenseId: string;
-      if ($isEditMode && editingExpense) {
+      if (isEditMode && editingExpense) {
         // Update existing expense
         if (dataService) {
           await dataService.updateTransaction(editingExpense.id, expenseData);
@@ -504,7 +513,7 @@
           <!-- Header -->
           <div class="modal-header">
             <h2 class="modal-title" id="modal-title">
-              {$isEditMode ? 'Edit Expense' : 'Add Expense'}
+              {isEditMode ? 'Edit Expense' : 'Add Expense'}
             </h2>
             <button class="modal-close" on:click={handleClose} aria-label="Close modal">
               &times;
@@ -549,9 +558,9 @@
                   class:error-state={$errors.category}
                   value={$formData.category}
                   on:change={handleCategoryChange}
-                  disabled={!$hasCategories}
+                  disabled={!hasCategories}
                 >
-                  {#if $hasCategories}
+                  {#if hasCategories}
                     <option value="OTHER">Choose category</option>
                     {#each categories as category}
                       {#if !category.disabled}
@@ -648,7 +657,7 @@
                   <span class="loading-spinner"></span>
                   Saving...
                 {:else}
-                  {$isEditMode ? 'Update Expense' : 'Save Expense'}
+                  {isEditMode ? 'Update Expense' : 'Save Expense'}
                 {/if}
               </button>
             </div>
