@@ -21,15 +21,32 @@
 
   // Helper function to get current date
   function getCurrentDate(): string {
-    return new Date().toISOString().split('T')[0];
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
+
+  // Local state for form fields - Initialize with explicit date
+  let dateValue: string = (() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+  let dateInputKey = 0; // Key to force re-render
+
+  // Debug: log initial date value
+  console.log('Initial dateValue:', dateValue);
 
   // Form data stores - Initialize with today's date
   const formData = writable({
     amount: '',
     category: 'OTHER',
     description: '',
-    date: getCurrentDate()
+    date: dateValue
   });
 
   const errors = writable({
@@ -75,6 +92,25 @@
   onMount(async () => {
     // Get return path from URL params
     returnPath = $page.url.searchParams.get('return') || 'dashboard';
+
+    // Ensure date is set to today and force re-render
+    const currentDate = getCurrentDate();
+    dateValue = currentDate;
+    formData.update(data => ({ ...data, date: currentDate }));
+    dateInputKey++; // Force re-render of date input
+
+    // Explicitly set date input value after a short delay
+    setTimeout(() => {
+      const dateInput = document.getElementById('expenseDate') as HTMLInputElement;
+      console.log('Date input element:', dateInput);
+      console.log('Date input current value:', dateInput?.value);
+      console.log('dateValue variable:', dateValue);
+      if (dateInput && !dateInput.value) {
+        console.log('Setting date input value to:', currentDate);
+        dateInput.value = currentDate;
+        dateValue = currentDate;
+      }
+    }, 50);
 
     await initializeExpenseForm();
     await loadCategories();
@@ -153,6 +189,7 @@
 
   function handleDateChange(event: Event) {
     const target = event.target as HTMLInputElement;
+    dateValue = target.value;
     formData.update(data => ({ ...data, date: target.value }));
     errors.update(errs => ({ ...errs, date: '' }));
 
@@ -532,17 +569,19 @@
         <!-- Date Input -->
         <div class="form-group">
           <label for="expenseDate" class="form-label">Date *</label>
-          <input
-            type="date"
-            id="expenseDate"
-            class="glass-input date-input"
-            class:error-state={$errors.date}
-            bind:value={$formData.date}
-            on:change={handleDateChange}
-            on:click={(e) => e.target.showPicker?.()}
-            on:focus={(e) => e.target.showPicker?.()}
-            required
-          />
+          {#key dateInputKey}
+            <input
+              type="date"
+              id="expenseDate"
+              class="glass-input date-input"
+              class:error-state={$errors.date}
+              bind:value={dateValue}
+              on:change={handleDateChange}
+              on:click={(e) => e.target.showPicker?.()}
+              on:focus={(e) => e.target.showPicker?.()}
+              required
+            />
+          {/key}
           {#if $errors.date}
             <div class="field-error">{$errors.date}</div>
           {/if}

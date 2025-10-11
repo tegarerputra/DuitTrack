@@ -27,12 +27,30 @@
   let hasBudgetSetup = false;
   let isLoadingBudget = false;
 
+  // Helper function to get current date
+  function getCurrentDate(): string {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Local state for form fields - Initialize with explicit date
+  let dateValue: string = (() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+
   // Form data stores
   const formData = writable({
     amount: '',
     category: 'OTHER',
     description: '',
-    date: getCurrentDate()
+    date: dateValue
   });
 
   const errors = writable({
@@ -108,16 +126,13 @@
     }
   }
 
-  function getCurrentDate(): string {
-    return new Date().toISOString().split('T')[0];
-  }
-
   function resetForm() {
+    dateValue = getCurrentDate();
     formData.set({
       amount: '',
       category: 'OTHER',
       description: '',
-      date: getCurrentDate()
+      date: dateValue
     });
 
     errors.set({
@@ -145,11 +160,12 @@
   function populateEditForm(expense: any) {
     const expenseDate = expense.date?.toDate ? expense.date.toDate() : new Date(expense.date);
 
+    dateValue = expenseDate.toISOString().split('T')[0];
     formData.set({
       amount: formatCurrencyInput(expense.amount),
       category: expense.category,
       description: expense.description || '',
-      date: expenseDate.toISOString().split('T')[0]
+      date: dateValue
     });
 
     errors.set({
@@ -208,6 +224,7 @@
 
   function handleDateChange(event: Event) {
     const target = event.target as HTMLInputElement;
+    dateValue = target.value;
     formData.update(data => ({ ...data, date: target.value }));
     errors.update(errs => ({ ...errs, date: '' }));
 
@@ -627,7 +644,7 @@
                 id="expenseDate"
                 class="glass-input date-input"
                 class:error-state={$errors.date}
-                value={$formData.date}
+                bind:value={dateValue}
                 on:change={handleDateChange}
                 required
               />
