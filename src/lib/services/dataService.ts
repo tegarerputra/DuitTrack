@@ -220,6 +220,54 @@ export class DataService {
     }
   }
 
+  /**
+   * Add category budget to a specific period
+   */
+  async addCategoryBudgetToPeriod(periodId: string, categoryId: string, budget: number): Promise<void> {
+    try {
+      const periodRef = doc(db, 'users', this.userId, 'periods', periodId);
+      const periodDoc = await getDoc(periodRef);
+
+      if (!periodDoc.exists()) {
+        throw new Error('Period not found');
+      }
+
+      const periodData = periodDoc.data() as Period;
+      const summary = periodData.summary || {
+        totalIncome: 0,
+        totalExpenses: 0,
+        totalBudget: 0,
+        categoryBreakdown: {},
+        transactionCount: 0
+      };
+
+      // Add or update category budget
+      if (!summary.categoryBreakdown[categoryId]) {
+        summary.categoryBreakdown[categoryId] = {
+          spent: 0,
+          budget: 0,
+          transactionCount: 0
+        };
+      }
+
+      summary.categoryBreakdown[categoryId].budget = budget;
+
+      // Recalculate total budget
+      summary.totalBudget = Object.values(summary.categoryBreakdown).reduce(
+        (sum, cat) => sum + (cat.budget || 0),
+        0
+      );
+
+      await updateDoc(periodRef, {
+        summary,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error adding category budget to period:', error);
+      throw new Error(`Failed to add category budget: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   // ========================================
   // PERIOD MANAGEMENT
   // ========================================
