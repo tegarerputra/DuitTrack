@@ -264,6 +264,24 @@ export const expenseActions = {
     expenseSearchStore.set('');
   },
 
+  // Change expense category
+  changeExpenseCategory: (expenseId: string, newCategory: string) => {
+    expensesStore.update(expenses =>
+      expenses.map(expense =>
+        expense.id === expenseId
+          ? { ...expense, category: newCategory.toUpperCase() }
+          : expense
+      )
+    );
+  },
+
+  // Delete expense (alias for removeExpense)
+  deleteExpense: (expenseId: string) => {
+    expensesStore.update(expenses =>
+      expenses.filter(expense => expense.id !== expenseId)
+    );
+  },
+
   // Load expenses for a specific period
   loadExpenses: async (periodId: string) => {
     expensesLoadingStore.set(true);

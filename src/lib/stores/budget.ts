@@ -339,24 +339,46 @@ export const budgetActions = {
     });
   },
 
-  // Load budget data (temporary mock implementation)
+  // Load budget data (using centralized dummy data)
   loadBudgetData: async (periodId?: string) => {
     budgetLoadingStore.set(true);
     budgetErrorStore.set(null);
 
-    // Simulate loading with mock data
+    // Dynamically import dummy data to ensure latest version
+    const { getDummyBudgetData, generateDummyExpenses } = await import('../utils/dummyData');
+
+    // Generate expenses to calculate spending
+    const expenses = generateDummyExpenses(25);
+
+    // Calculate spending per category from actual expenses
+    const categorySpending: Record<string, number> = {};
+    expenses.forEach((expense: any) => {
+      const categoryId = expense.category.toLowerCase();
+      categorySpending[categoryId] = (categorySpending[categoryId] || 0) + expense.amount;
+    });
+
+    // Get budget data with real spending
+    const budgetDummyData = getDummyBudgetData();
+
+    // Update categories with REAL spending from expenses
+    const categoriesWithSpending: Record<string, CategoryBudget> = {};
+    Object.entries(budgetDummyData.categories).forEach(([catId, catData]: [string, any]) => {
+      categoriesWithSpending[catId] = {
+        budget: catData.budget,
+        spent: categorySpending[catId] || 0
+      };
+    });
+
+    const totalSpent = Object.values(categoriesWithSpending).reduce((sum, cat) => sum + cat.spent, 0);
+
+    // Simulate loading delay
     setTimeout(() => {
       const mockBudget: Budget = {
         id: `budget_${periodId || getCurrentMonth()}`,
         month: periodId || getCurrentMonth(),
-        categories: {
-          food: { budget: 2000000, spent: 1200000 },
-          transport: { budget: 1000000, spent: 800000 },
-          entertainment: { budget: 500000, spent: 300000 },
-          shopping: { budget: 800000, spent: 400000 }
-        },
-        totalBudget: 4300000,
-        totalSpent: 2700000,
+        categories: categoriesWithSpending,
+        totalBudget: budgetDummyData.totalBudget,
+        totalSpent: totalSpent,
         userId: 'current_user'
       };
 

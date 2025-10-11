@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { writable, derived } from 'svelte/store';
@@ -12,14 +12,13 @@
   // Navigation context
   let returnPath = '';
   let dataService: DataService | null = null;
-  let budgetData: any = null;
   let isSubmitting = false;
   let showSuccessState = false;
   let dailyWarnings = new Map();
   let categories: any[] = [];
-  let isLoadingBudget = false;
+  let isLoadingCategories = false;
 
-  // Helper function to get current date
+  // Helper function to get current date (single source of truth)
   function getCurrentDate(): string {
     const date = new Date();
     const year = date.getFullYear();
@@ -28,25 +27,16 @@
     return `${year}-${month}-${day}`;
   }
 
-  // Local state for form fields - Initialize with explicit date
-  let dateValue: string = (() => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  })();
+  // Local state for form fields - Initialize with current date
+  let dateValue: string = getCurrentDate();
   let dateInputKey = 0; // Key to force re-render
-
-  // Debug: log initial date value
-  console.log('Initial dateValue:', dateValue);
 
   // Form data stores - Initialize with today's date
   const formData = writable({
     amount: '',
     category: 'OTHER',
     description: '',
-    date: dateValue
+    date: getCurrentDate()
   });
 
   const errors = writable({
@@ -63,13 +53,21 @@
     data: {}
   });
 
+  // Validation constants
+  const MAX_AMOUNT = 999999999;
+  const MIN_AMOUNT = 1;
+
+  // Helper function to validate amount
+  function isValidAmount(amount: number): boolean {
+    return amount >= MIN_AMOUNT && amount <= MAX_AMOUNT;
+  }
+
   // Derived stores
   const isFormValid = derived(
     [formData, errors],
     ([$formData, $errors]) => {
       const amount = parseCurrencyInput($formData.amount);
-      return amount > 0 &&
-             amount <= 999999999 &&
+      return isValidAmount(amount) &&
              $formData.date &&
              !$errors.date &&
              !$errors.amount;
@@ -80,13 +78,33 @@
   $: hasCategories = categories && categories.length > 0 && !categories.every(cat => cat.disabled);
 
   // Reactive subscription to budget store - automatically update categories when budget changes
-  $: if ($budgetStore && $budgetStore.categories) {
-    categories = Object.entries($budgetStore.categories).map(([key, data]: [string, any]) => ({
-      value: key.toUpperCase(),
-      label: formatCategoryName(key),
-      disabled: false
-    }));
+  $: {
+    if ($budgetStore && typeof $budgetStore === 'object' && $budgetStore.categories) {
+      try {
+        categories = Object.entries($budgetStore.categories).map(([key, data]: [string, any]) => ({
+          value: key.toUpperCase(),
+          label: formatCategoryName(key),
+          disabled: false
+        }));
+        isLoadingCategories = false;
+      } catch (error) {
+        console.error('Error processing budget categories:', error);
+        categories = [];
+        isLoadingCategories = false;
+      }
+    } else if ($budgetStore === null) {
+      // Budget store explicitly set to null (no budget configured)
+      categories = [];
+      isLoadingCategories = false;
+    }
   }
+
+  // Cleanup timeout on destroy
+  onDestroy(() => {
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+    }
+  });
 
   // Component initialization
   onMount(async () => {
@@ -102,23 +120,25 @@
     // Explicitly set date input value after a short delay
     setTimeout(() => {
       const dateInput = document.getElementById('expenseDate') as HTMLInputElement;
-      console.log('Date input element:', dateInput);
-      console.log('Date input current value:', dateInput?.value);
-      console.log('dateValue variable:', dateValue);
       if (dateInput && !dateInput.value) {
-        console.log('Setting date input value to:', currentDate);
         dateInput.value = currentDate;
         dateValue = currentDate;
       }
     }, 50);
 
     await initializeExpenseForm();
-    await loadCategories();
+    await loadBudgetAndCategories();
   });
 
   // Watch for form changes to trigger smart validation
-  $: if ($formData.amount && $formData.category !== 'OTHER') {
-    debounceSmartValidation();
+  $: {
+    try {
+      if ($formData && $formData.amount && $formData.category !== 'OTHER') {
+        debounceSmartValidation();
+      }
+    } catch (error) {
+      console.error('Error in smart validation watch:', error);
+    }
   }
 
   async function initializeExpenseForm() {
@@ -132,13 +152,16 @@
     }
   }
 
-  async function loadCategories() {
+  async function loadBudgetAndCategories() {
     try {
+      isLoadingCategories = true;
       // Load budget data - reactive statement will handle updating categories
       await budgetActions.loadBudgetData();
+      // Reactive statement will set isLoadingCategories to false
     } catch (error) {
       console.error('Error loading categories:', error);
       categories = [];
+      isLoadingCategories = false;
     }
   }
 
@@ -168,10 +191,10 @@
     // Clear previous amount errors
     errors.update(errs => ({ ...errs, amount: '' }));
 
-    // Validate amount
+    // Validate amount using consolidated logic
     const amount = parseCurrencyInput(formattedValue);
-    if (amount > 999999999) {
-      errors.update(errs => ({ ...errs, amount: "Whoa there, millionaire! Max Rp 999,999,999 please!" }));
+    if (amount > MAX_AMOUNT) {
+      errors.update(errs => ({ ...errs, amount: `Whoa there, millionaire! Max Rp ${formatCurrencyInput(MAX_AMOUNT)} please!` }));
     }
   }
 
@@ -196,6 +219,32 @@
     // Validate date
     if (target.value) {
       validateDateInput(target.value);
+    }
+
+    // Clear old warnings when date changes (cleanup memory)
+    const today = new Date().toDateString();
+    const keysToDelete: string[] = [];
+
+    dailyWarnings.forEach((value, key) => {
+      if (value !== today) {
+        keysToDelete.push(key);
+      }
+    });
+
+    keysToDelete.forEach(key => dailyWarnings.delete(key));
+  }
+
+  function handleDateClick(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input && input.showPicker) {
+      input.showPicker();
+    }
+  }
+
+  function handleDateFocus(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input && input.showPicker) {
+      input.showPicker();
     }
   }
 
@@ -222,71 +271,50 @@
     return true;
   }
 
-  let validationTimeout: number;
+  let validationTimeout: ReturnType<typeof setTimeout> | undefined;
   function debounceSmartValidation() {
-    clearTimeout(validationTimeout);
+    if (validationTimeout) clearTimeout(validationTimeout);
     validationTimeout = setTimeout(() => {
       checkSmartValidation();
     }, 200);
   }
 
   async function checkSmartValidation() {
-    const data = $formData;
-    const amount = parseCurrencyInput(data.amount);
-    const category = data.category;
-
-    if (amount <= 0 || category === 'OTHER') {
-      smartWarning.set({ show: false, type: '', data: {} });
-      return;
-    }
-
-    // Prevent race condition - don't load if already loading
-    if (isLoadingBudget) {
-      return;
-    }
-
-    if (!budgetData) {
-      await loadBudgetData();
-    }
-
-    if (budgetData && budgetData.categories && budgetData.categories[category.toLowerCase()]) {
-      await evaluateBudgetWarning(amount, category);
-    } else {
-      smartWarning.set({ show: false, type: '', data: {} });
-    }
-  }
-
-  async function loadBudgetData() {
-    if (isLoadingBudget) return;
-
     try {
-      isLoadingBudget = true;
+      const data = $formData;
+      if (!data) {
+        smartWarning.set({ show: false, type: '', data: {} });
+        return;
+      }
 
-      if (!dataService) return;
+      const amount = parseCurrencyInput(data.amount);
+      const category = data.category;
 
-      // Load from budget store
-      await budgetActions.loadBudgetData();
+      if (amount <= 0 || category === 'OTHER') {
+        smartWarning.set({ show: false, type: '', data: {} });
+        return;
+      }
 
-      // Get from budget store
+      // Use $budgetStore directly - single source of truth
       const currentBudget = $budgetStore;
-      if (currentBudget && currentBudget.categories) {
-        budgetData = {
-          categories: currentBudget.categories
-        };
+
+      if (currentBudget && typeof currentBudget === 'object' && currentBudget.categories && currentBudget.categories[category.toLowerCase()]) {
+        evaluateBudgetWarning(amount, category, currentBudget.categories[category.toLowerCase()]);
       } else {
-        budgetData = null;
+        smartWarning.set({ show: false, type: '', data: {} });
       }
     } catch (error) {
-      console.error('Error loading budget data:', error);
-      budgetData = null;
-    } finally {
-      isLoadingBudget = false;
+      console.error('Error in checkSmartValidation:', error);
+      smartWarning.set({ show: false, type: '', data: {} });
     }
   }
 
-  async function evaluateBudgetWarning(amount: number, category: string) {
-    const categoryData = budgetData.categories[category.toLowerCase()];
-    if (!categoryData) return;
+  function evaluateBudgetWarning(amount: number, category: string, categoryData: any) {
+    // Safety check
+    if (!categoryData) {
+      smartWarning.set({ show: false, type: '', data: {} });
+      return;
+    }
 
     const currentSpent = categoryData.spent || 0;
     const budget = categoryData.budget || 0;
@@ -353,26 +381,40 @@
         return;
       }
 
-      const expenseData = {
+      // Get current user
+      const user = await authService.getCurrentUser();
+      if (!user) {
+        errors.update(errs => ({ ...errs, system: 'Please sign in to save expenses' }));
+        return;
+      }
+
+      const transactionData = {
         amount,
         category: data.category.toUpperCase(),
         description: data.description,
         date: data.date,
         type: 'expense' as const,
-        periodId: getCurrentPeriodId(),
-        categoryId: data.category.toLowerCase()
+        userId: user.uid
       };
 
       let expenseId: string;
       // Create new expense
       if (dataService) {
-        expenseId = await dataService.createTransaction(expenseData);
+        expenseId = await dataService.createTransaction(transactionData);
       } else {
         expenseId = generateTempId();
       }
 
+      // Prepare expense data with additional fields for store
+      const expenseData = {
+        ...transactionData,
+        id: expenseId,
+        periodId: getCurrentPeriodId(),
+        categoryId: data.category.toLowerCase()
+      };
+
       // Update stores
-      await expenseActions.addExpense({ id: expenseId, ...expenseData });
+      await expenseActions.addExpense(expenseData as any);
       await budgetActions.updateCategorySpending(data.category.toLowerCase(), amount);
 
       // Show success and redirect
@@ -392,11 +434,12 @@
   function validateFormData(amount: number, data: any): boolean {
     let hasErrors = false;
 
-    if (!amount || amount <= 0) {
+    // Validate amount using consolidated logic
+    if (!amount || amount < MIN_AMOUNT) {
       errors.update(errs => ({ ...errs, amount: "Don't leave me empty! I need an amount!" }));
       hasErrors = true;
-    } else if (amount > 999999999) {
-      errors.update(errs => ({ ...errs, amount: "Whoa there, millionaire! Max Rp 999,999,999 please!" }));
+    } else if (!isValidAmount(amount)) {
+      errors.update(errs => ({ ...errs, amount: `Whoa there, millionaire! Max Rp ${formatCurrencyInput(MAX_AMOUNT)} please!` }));
       hasErrors = true;
     }
 
@@ -546,9 +589,11 @@
               class:error-state={$errors.category}
               value={$formData.category}
               on:change={handleCategoryChange}
-              disabled={!hasCategories}
+              disabled={!hasCategories || isLoadingCategories}
             >
-              {#if hasCategories}
+              {#if isLoadingCategories}
+                <option value="OTHER">Loading categories...</option>
+              {:else if hasCategories}
                 <option value="OTHER">Choose category</option>
                 {#each categories as category}
                   {#if !category.disabled}
@@ -577,8 +622,8 @@
               class:error-state={$errors.date}
               bind:value={dateValue}
               on:change={handleDateChange}
-              on:click={(e) => e.target.showPicker?.()}
-              on:focus={(e) => e.target.showPicker?.()}
+              on:click={handleDateClick}
+              on:focus={handleDateFocus}
               required
             />
           {/key}

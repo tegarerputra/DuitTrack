@@ -9,8 +9,10 @@ export const DUMMY_CATEGORIES = [
   { id: 'transport', name: 'Transport', emoji: '🚗', budget: 1000000 },
   { id: 'shopping', name: 'Belanja', emoji: '🛍️', budget: 1500000 },
   { id: 'entertainment', name: 'Hiburan', emoji: '🎬', budget: 800000 },
+  { id: 'health', name: 'Kesehatan', emoji: '⚕️', budget: 700000 },
+  { id: 'education', name: 'Pendidikan', emoji: '📚', budget: 500000 },
   { id: 'utilities', name: 'Tagihan', emoji: '💡', budget: 600000 },
-  { id: 'savings', name: 'Tabungan', emoji: '💰', budget: 3000000 }
+  { id: 'other', name: 'Lainnya', emoji: '📦', budget: 400000 }
 ];
 
 export const DUMMY_EXPENSE_DESCRIPTIONS: Record<string, string[]> = {
@@ -18,8 +20,10 @@ export const DUMMY_EXPENSE_DESCRIPTIONS: Record<string, string[]> = {
   'transport': ['Grab ride', 'Isi bensin', 'Parkir', 'Tol'],
   'shopping': ['Beli baju', 'Elektronik', 'Beli buku', 'Peralatan rumah'],
   'entertainment': ['Nonton bioskop', 'Konser', 'Game', 'Netflix'],
+  'health': ['Dokter', 'Beli obat', 'Gym membership', 'Vitamin'],
+  'education': ['Kursus online', 'Beli buku pelajaran', 'Workshop', 'Seminar'],
   'utilities': ['Listrik', 'Air', 'Internet', 'Pulsa'],
-  'savings': ['Transfer tabungan', 'Investasi', 'Dana darurat', 'Deposito']
+  'other': ['Lain-lain', 'Misc expenses', 'Donation', 'Gift']
 };
 
 export function generateDummyExpenses(count: number = 25) {

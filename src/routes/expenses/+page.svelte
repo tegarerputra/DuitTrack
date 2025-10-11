@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
+  import { slide } from 'svelte/transition';
+  import toast from 'svelte-french-toast';
   import {
     expensesStore,
     filteredExpenses,
@@ -11,7 +13,8 @@
     expenseSearchStore,
     expensesLoadingStore
   } from '../../lib/stores/expenses';
-  import { budgetStore } from '../../lib/stores/budget';
+  import { budgetStore, budgetCategoriesStore } from '../../lib/stores/budget';
+  import InlineCategorySelector from '../../lib/components/expense/InlineCategorySelector.svelte';
 
   // Navigation context
   let returnPath = '';
@@ -25,6 +28,12 @@
 
   // Chart data
   let chartData: any[] = [];
+
+  // Track which expense has open category selector
+  let activeExpenseId: string | null = null;
+
+  // Undo functionality
+  let undoStack: Array<{ expenseId: string; oldCategory: string; newCategory: string }> = [];
 
   onMount(() => {
     // Get URL parameters
@@ -42,6 +51,22 @@
     // Load data
     loadExpensesData();
     loadCategories();
+
+    // Add click outside handler
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Check if click is outside expense items
+      if (!target.closest('.expense-item-enhanced')) {
+        activeExpenseId = null;
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
   });
 
   function updateCurrentPeriod() {
@@ -71,14 +96,15 @@
   }
 
   async function loadCategories() {
-    // Get categories from budget store
-    budgetStore.subscribe(budget => {
-      if (budget && budget.categories) {
-        categories = Object.keys(budget.categories).map(key => ({
-          value: key.toUpperCase(),
-          label: formatCategoryName(key),
-          count: 0
+    // Get categories from budgetCategoriesStore
+    budgetCategoriesStore.subscribe(budgetCategories => {
+      if (budgetCategories && budgetCategories.length > 0) {
+        categories = budgetCategories.map(cat => ({
+          value: cat.id.toUpperCase(),
+          label: cat.name,
+          icon: cat.icon
         }));
+        console.log('📋 Categories loaded:', categories);
       }
     });
   }
@@ -111,8 +137,93 @@
   }
 
   function handleExpenseClick(expense: any) {
-    // For now, just show in console - later add edit functionality
-    console.log('Expense clicked:', expense);
+    // Toggle category selector
+    if (activeExpenseId === expense.id) {
+      activeExpenseId = null;
+    } else {
+      activeExpenseId = expense.id;
+    }
+  }
+
+  function handleCategoryChange(expense: any, event: CustomEvent) {
+    const { newCategory } = event.detail;
+    const oldCategory = expense.category;
+
+    // Save to undo stack
+    undoStack.push({
+      expenseId: expense.id,
+      oldCategory,
+      newCategory
+    });
+
+    // Update the category
+    expenseActions.changeExpenseCategory(expense.id, newCategory);
+
+    // Close the selector
+    activeExpenseId = null;
+
+    // Show success toast with undo
+    const toastId = toast.success(
+      (t) => {
+        return `
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <span>✓ Kategori diubah ke ${formatCategoryName(newCategory)}</span>
+            <button
+              onclick="window.undoLastCategoryChange()"
+              style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 4px 12px; color: white; cursor: pointer; font-weight: 600;"
+            >
+              Undo
+            </button>
+          </div>
+        `;
+      },
+      {
+        duration: 5000,
+        style: 'background: linear-gradient(135deg, rgba(0, 191, 255, 0.9), rgba(30, 144, 255, 0.95)); color: white; padding: 12px 16px; border-radius: 12px;'
+      }
+    );
+  }
+
+  function handleDeleteExpense(expense: any, event: Event) {
+    event.stopPropagation();
+
+    // Store expense info for confirmation
+    const expenseInfo = {
+      id: expense.id,
+      category: formatCategoryName(expense.category),
+      amount: formatCurrency(expense.amount)
+    };
+
+    // Show simple confirmation message
+    const confirmed = confirm(`🗑️ Hapus expense ini?\n\n${expenseInfo.category} - ${expenseInfo.amount}\n\nKlik OK untuk menghapus atau Cancel untuk membatalkan.`);
+
+    if (confirmed) {
+      // Delete the expense
+      expenseActions.deleteExpense(expense.id);
+
+      // Close active state
+      activeExpenseId = null;
+
+      // Show success toast
+      toast.success('✓ Expense berhasil dihapus', {
+        duration: 3000,
+        style: 'background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.95)); color: white; padding: 12px 16px; border-radius: 12px;'
+      });
+    }
+  }
+
+  // Setup global functions for toast interactions
+  $: if (typeof window !== 'undefined') {
+    (window as any).undoLastCategoryChange = () => {
+      const lastChange = undoStack.pop();
+      if (lastChange) {
+        expenseActions.changeExpenseCategory(lastChange.expenseId, lastChange.oldCategory);
+        toast.success('✓ Perubahan dibatalkan', {
+          duration: 2000,
+          style: 'background: rgba(107, 114, 128, 0.95); color: white;'
+        });
+      }
+    };
   }
 
   function formatCurrency(amount: number): string {
@@ -360,17 +471,42 @@
 
             <div class="expense-items">
               {#each dayExpenses as expense}
-                <div class="expense-item-enhanced" on:click={() => handleExpenseClick(expense)}>
+                <div
+                  class="expense-item-enhanced"
+                  class:active={activeExpenseId === expense.id}
+                  on:click={(e) => handleExpenseClick(expense)}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => e.key === 'Enter' && handleExpenseClick(expense)}
+                >
                   <div class="expense-icon-enhanced">
                     {getCategoryIcon(expense.category)}
                   </div>
                   <div class="expense-details">
+                    {#if activeExpenseId === expense.id}
+                      <InlineCategorySelector
+                        currentCategory={expense.category}
+                        {categories}
+                        on:categoryChange={(e) => handleCategoryChange(expense, e)}
+                      />
+                    {:else}
+                      <div class="expense-category">{formatCategoryName(expense.category)}</div>
+                    {/if}
                     <div class="expense-description">{expense.description}</div>
-                    <div class="expense-category">{formatCategoryName(expense.category)}</div>
                   </div>
                   <div class="expense-amount">
                     {formatCurrency(expense.amount)}
                   </div>
+                  {#if activeExpenseId === expense.id}
+                    <button
+                      class="delete-button"
+                      on:click={(e) => handleDeleteExpense(expense, e)}
+                      title="Hapus expense"
+                      type="button"
+                    >
+                      🗑️
+                    </button>
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -1011,6 +1147,7 @@
   /* Expense Groups */
   .expense-group {
     padding: 1.5rem;
+    overflow: visible;
   }
 
   .group-header {
@@ -1037,12 +1174,14 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    position: relative;
+    z-index: 1;
   }
 
   /* ===== ENHANCED EXPENSE ITEMS ===== */
   .expense-item-enhanced {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 1rem;
     padding: 16px;
     background: rgba(255, 255, 255, 0.1);
@@ -1052,6 +1191,7 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     backdrop-filter: blur(5px);
     min-height: 80px;
+    position: relative;
   }
 
   .expense-item-enhanced:hover {
@@ -1066,6 +1206,18 @@
     background: rgba(0, 191, 255, 0.1);
   }
 
+  .expense-item-enhanced.active {
+    background: rgba(0, 191, 255, 0.12);
+    border-color: rgba(0, 191, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 191, 255, 0.15);
+    min-height: auto;
+    align-items: flex-start;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    z-index: 100;
+  }
+
   .expense-icon-enhanced {
     width: 44px;
     height: 44px;
@@ -1078,27 +1230,72 @@
     align-items: center;
     justify-content: center;
     font-size: 20px;
+    flex-shrink: 0;
   }
 
   .expense-details {
     flex: 1;
   }
 
-  .expense-description {
+  .expense-category {
     color: #1f2937;
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 1rem;
     margin-bottom: 0.25rem;
   }
 
-  .expense-category {
+  .expense-description {
     color: #6b7280;
-    font-size: 0.85rem;
+    font-weight: 400;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 
   .expense-amount {
     color: #1f2937;
     font-weight: 600;
     text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* Delete Button */
+  .delete-button {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg,
+      rgba(239, 68, 68, 0.1) 0%,
+      rgba(220, 38, 38, 0.15) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    margin-left: 8px;
+  }
+
+  .delete-button:hover {
+    background: linear-gradient(135deg,
+      rgba(239, 68, 68, 0.2) 0%,
+      rgba(220, 38, 38, 0.25) 100%);
+    border-color: rgba(239, 68, 68, 0.5);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+  }
+
+  .delete-button:active {
+    transform: scale(0.95);
+    background: linear-gradient(135deg,
+      rgba(239, 68, 68, 0.3) 0%,
+      rgba(220, 38, 38, 0.35) 100%);
   }
 
   /* Floating Add Button */
@@ -1200,6 +1397,11 @@
       gap: 0.75rem;
     }
 
+    .expense-item-enhanced.active {
+      min-height: auto;
+      margin-bottom: 12px;
+    }
+
     .expense-icon-enhanced {
       width: 36px;
       height: 36px;
@@ -1207,17 +1409,25 @@
       border-radius: 10px;
     }
 
-    .expense-description {
+    .expense-category {
       font-size: 0.9rem;
       margin-bottom: 0.15rem;
     }
 
-    .expense-category {
-      font-size: 0.75rem;
+    .expense-description {
+      font-size: 0.8rem;
     }
 
     .expense-amount {
       font-size: 0.9rem;
+    }
+
+    .delete-button {
+      width: 36px;
+      height: 36px;
+      font-size: 16px;
+      border-radius: 8px;
+      margin-left: 6px;
     }
 
     /* Optimize expense groups for mobile */

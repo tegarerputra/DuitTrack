@@ -6,6 +6,7 @@
   import { uiActions } from '$stores/ui';
   import AuthErrorDisplay from '$components/auth/AuthErrorDisplay.svelte';
   import SimpleNav from '$components/navigation/SimpleNav.svelte';
+  import { Toaster } from 'svelte-french-toast';
 
   // FIXED: Accept route params to prevent unknown prop warnings
   export let params: Record<string, string> = {};
@@ -127,6 +128,9 @@
 
   <!-- Global error display for authentication -->
   <AuthErrorDisplay />
+
+  <!-- Toast Notifications -->
+  <Toaster position="top-center" />
 
   <!-- Main Content with top padding for fixed navbar -->
   <div class="pt-16">
