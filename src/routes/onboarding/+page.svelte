@@ -16,6 +16,43 @@
   let showCustomInput = false;
   let nickname = ''; // Custom nickname
   let nicknameError = '';
+  let selectedRole: 'pns' | 'swasta' | 'freelancer' | 'custom' | null = null; // Track which role is selected
+
+  // Role-based period tracking options
+  const roleOptions = [
+    {
+      id: 'pns',
+      icon: '👔',
+      label: 'PNS/ASN',
+      description: 'Gajian tanggal 1',
+      resetDay: 1,
+      popular: false
+    },
+    {
+      id: 'swasta',
+      icon: '💼',
+      label: 'Karyawan Swasta',
+      description: 'Gajian tanggal 25',
+      resetDay: 25,
+      popular: true
+    },
+    {
+      id: 'freelancer',
+      icon: '✨',
+      label: 'Freelancer',
+      description: 'Reset awal bulan',
+      resetDay: 1,
+      popular: false
+    },
+    {
+      id: 'custom',
+      icon: '✏️',
+      label: 'Custom',
+      description: 'Pilih tanggal sendiri',
+      resetDay: null,
+      popular: false
+    }
+  ];
 
   const presetOptions = getResetDatePresets();
 
@@ -97,6 +134,7 @@
     const profileData = {
       onboardingComplete: true,
       ...(nickname.trim() && { nickname: nickname.trim() }), // Only add if not empty
+      ...(selectedRole && { role: selectedRole }), // Save the selected role
       currency: 'IDR',
       locale: 'id-ID',
       budgetResetDate: resetType === 'last-day-of-month' ? -1 : selectedResetDate,
@@ -178,6 +216,29 @@
   function handleCustomInput() {
     showCustomInput = true;
     resetType = 'fixed';
+  }
+
+  // Role selection handler - automatically sets period based on role
+  function selectRole(roleId: 'pns' | 'swasta' | 'freelancer' | 'custom') {
+    selectedRole = roleId;
+    const role = roleOptions.find(r => r.id === roleId);
+
+    if (role) {
+      if (role.resetDay !== null) {
+        // Auto-set period for predefined roles
+        selectedResetDate = role.resetDay;
+        resetType = 'fixed';
+        showCustomInput = false;
+      } else {
+        // Show custom input for custom role
+        showCustomInput = true;
+        resetType = 'fixed';
+        // Keep current selectedResetDate or default to 15
+        if (selectedResetDate < 1 || selectedResetDate > 31) {
+          selectedResetDate = 15;
+        }
+      }
+    }
   }
 
   async function handleSignOut() {
@@ -307,97 +368,61 @@
             <div class="text-center mb-6">
               <div class="step-icon">📅</div>
               <h2 class="step-title">
-                Kapan Periode Tracking Kamu Dimulai?
+                Ceritain dong, kamu kerja apa? 👀
               </h2>
               <p class="step-subtitle">
-                Pilih tanggal sesuai jadwal gajian untuk tracking yang lebih akurat
+                Biar aku bisa bantu atur periode tracking yang pas buat jadwal gajimu!
               </p>
             </div>
 
-          <!-- Preset Options - Simplified -->
-          <div class="space-y-3 mb-4">
-            {#each presetOptions as option}
+          <!-- Role-Based Options - 4 Cards -->
+          <div class="main-options">
+            {#each roleOptions as role}
               <button
-                class="preset-btn {selectedResetDate === option.value && resetType === 'fixed' ? 'active' : ''}"
-                on:click={() => handlePresetSelect(option.value)}
+                class="main-option-card {selectedRole === role.id ? 'active' : ''}"
+                on:click={() => selectRole(role.id)}
               >
-                <div class="preset-icon">📅</div>
-                <div class="flex-1 text-left">
-                  <div class="preset-label">{option.label}</div>
-                  <div class="preset-description">{option.description}</div>
+                <div class="option-icon">{role.icon}</div>
+                <div class="option-content">
+                  <div class="option-label">{role.label}</div>
+                  <div class="option-value">{role.description}</div>
                 </div>
-                {#if option.popular}
-                  <span class="badge-popular">Populer ⭐</span>
+                {#if selectedRole === role.id}
+                  <div class="option-check">✓</div>
+                {/if}
+                {#if role.popular}
+                  <span class="badge-popular-main">Populer ⭐</span>
                 {/if}
               </button>
             {/each}
-
-            <!-- Last Day Option -->
-            <button
-              class="preset-btn {resetType === 'last-day-of-month' ? 'active' : ''}"
-              on:click={handleLastDaySelect}
-            >
-              <div class="preset-icon">📅</div>
-              <div class="flex-1 text-left">
-                <div class="preset-label">Akhir bulan</div>
-                <div class="preset-description">Reset otomatis tiap akhir bulan</div>
-              </div>
-            </button>
-
-            <!-- Custom Input -->
-            <button
-              class="preset-btn {showCustomInput ? 'active' : ''}"
-              on:click={handleCustomInput}
-            >
-              <div class="preset-icon">✏️</div>
-              <div class="flex-1 text-left">
-                <div class="preset-label">Custom tanggal</div>
-                <div class="preset-description">Tentukan tanggal sendiri (1-31)</div>
-              </div>
-            </button>
-
-            {#if showCustomInput}
-              <div class="custom-input-box" transition:fly={{ y: -10, duration: 200 }}>
-                <label for="custom-date-input" class="custom-input-label">Pilih tanggal (1-31):</label>
-                <input
-                  id="custom-date-input"
-                  type="number"
-                  min="1"
-                  max="31"
-                  bind:value={selectedResetDate}
-                  class="custom-input"
-                  placeholder="Masukkan tanggal"
-                />
-              </div>
-            {/if}
           </div>
 
-          <!-- Preview - Always Visible, Simplified -->
-          {#if currentPeriod}
-            <div class="preview-info" transition:fly={{ y: -10, duration: 300 }}>
-              <div class="preview-title">Periode Mendatang:</div>
-              <ul class="preview-list">
-                {#each periodPreview.slice(0, 2) as period, i}
-                  <li class="preview-item">
-                    <span class="preview-bullet">•</span>
-                    <span class="preview-text">
-                      Periode {i + 1}: {formatPeriodDisplay(period.startDate, period.endDate)}
-                      {#if period.isActive}
-                        <span class="preview-badge">Current ✓</span>
-                      {/if}
-                    </span>
-                  </li>
-                {/each}
-              </ul>
-              <div class="preview-reset">
-                <span class="preview-reset-icon">🔄</span>
-                <span class="preview-reset-text">
-                  Reset setiap:
-                  {#if resetType === 'last-day-of-month'}
-                    Akhir bulan
-                  {:else}
-                    Tanggal {selectedResetDate}
-                  {/if}
+          <!-- Custom Input - Appears below all cards when selected -->
+          {#if showCustomInput}
+            <div class="custom-input-inline" transition:fly={{ y: -10, duration: 200 }}>
+              <label for="custom-date-input" class="custom-inline-label">
+                Pilih tanggal reset (1-31):
+              </label>
+              <input
+                id="custom-date-input"
+                type="number"
+                min="1"
+                max="31"
+                bind:value={selectedResetDate}
+                class="custom-inline-input"
+                placeholder="Contoh: 15"
+              />
+            </div>
+          {/if}
+
+          <!-- Minimal Preview - Single Line -->
+          {#if selectedRole && currentPeriod}
+            <div class="preview-minimal" transition:fly={{ y: -10, duration: 300 }}>
+              <div class="preview-minimal-icon">📅</div>
+              <div class="preview-minimal-text">
+                <span class="preview-minimal-label">Periode Tracking:</span>
+                <span class="preview-minimal-value">
+                  {formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate)}
                 </span>
               </div>
             </div>
@@ -422,8 +447,8 @@
                     <div class="loading-spinner"></div>
                     <span class="button-text">Menyimpan...</span>
                   {:else}
-                    <span class="button-text">Lanjut</span>
-                    <span class="button-icon">→</span>
+                    <span class="button-text">Simpan</span>
+                    <span class="button-icon">✓</span>
                   {/if}
                 </span>
                 <div class="button-glow"></div>
@@ -445,28 +470,20 @@
                 </svg>
               </div>
             </div>
-            <h3 class="choice-title">Periode Tracking Tersimpan!</h3>
-            <p class="choice-info">
-              Reset setiap:
-              {#if resetType === 'last-day-of-month'}
-                Akhir bulan
-              {:else}
-                Tanggal {selectedResetDate}
-              {/if}
-            </p>
+            <h3 class="choice-title">Yeay, udah beres! 🎉</h3>
 
             {#if currentPeriod}
               <p class="choice-period">
-                Periode saat ini: {formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate)}
+                Tracking period: {formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate)}
               </p>
             {/if}
 
             <div class="choice-divider"></div>
 
             <!-- Budget Setup Prompt -->
-            <h4 class="choice-question">Mau lanjut setup budget sekarang?</h4>
+            <h4 class="choice-question">Mau lanjut setup budget?</h4>
             <p class="choice-subtitle">
-              Dengan setup budget, kamu bisa kontrol pengeluaran lebih baik
+              Biar kamu tau uang bulanan habis kemana aja!
             </p>
 
             <!-- Action Buttons - Instant Navigation (no loading state needed) -->
@@ -482,20 +499,13 @@
             </button>
 
             <button
-              class="secondary-button w-full mb-3"
+              class="secondary-button w-full"
               on:click={skipToDashboard}
             >
               <span class="button-content">
                 <span class="button-icon">⏭️</span>
                 <span class="button-text">Nanti aja, ke Dashboard</span>
               </span>
-            </button>
-
-            <button
-              class="secondary-button w-full"
-              on:click={backToTrackingSetup}
-            >
-              Kembali
             </button>
           </div>
         {/if}
@@ -755,8 +765,9 @@
 
   /* Step 2 Specific */
   .step-icon {
-    font-size: 56px;
-    margin-bottom: 12px;
+    font-size: 48px;
+    margin-bottom: 16px;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
   }
 
   .step-title {
@@ -771,6 +782,209 @@
     font-size: 15px;
     color: #6b7280;
     line-height: 1.5;
+  }
+
+  /* Main Options Container */
+  .main-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 8px 0;
+  }
+
+  /* Main Option Cards */
+  .main-option-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(248, 252, 255, 0.5) 100%);
+    border: 2px solid rgba(6, 182, 212, 0.2);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    overflow: visible;
+    width: 100%;
+    text-align: left;
+  }
+
+  .main-option-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.1), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .main-option-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(6, 182, 212, 0.4);
+    box-shadow: 0 8px 24px rgba(6, 182, 212, 0.15);
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.8) 0%,
+      rgba(248, 252, 255, 0.7) 100%);
+  }
+
+  .main-option-card:hover::before {
+    left: 100%;
+  }
+
+  .main-option-card.active {
+    border: 2px solid rgba(6, 182, 212, 0.6);
+    background: linear-gradient(135deg,
+      rgba(6, 182, 212, 0.12) 0%,
+      rgba(240, 248, 255, 0.8) 100%);
+    box-shadow: 0 8px 28px rgba(6, 182, 212, 0.2);
+    transform: translateY(-2px);
+  }
+
+  .option-icon {
+    font-size: 36px;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  }
+
+  .option-content {
+    flex: 1;
+  }
+
+  .option-label {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .option-value {
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .option-check {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    flex-shrink: 0;
+  }
+
+  .badge-popular-main {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+    z-index: 10;
+  }
+
+  /* Custom Input Inline */
+  .custom-input-inline {
+    padding: 20px;
+    background: linear-gradient(135deg,
+      rgba(6, 182, 212, 0.08) 0%,
+      rgba(240, 248, 255, 0.6) 100%);
+    border: 2px solid rgba(6, 182, 212, 0.25);
+    border-radius: 12px;
+    backdrop-filter: blur(15px);
+    margin-bottom: 16px;
+  }
+
+  .custom-inline-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 12px;
+  }
+
+  .custom-inline-input {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(6, 182, 212, 0.3);
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+    text-align: center;
+  }
+
+  .custom-inline-input:focus {
+    outline: none;
+    border-color: rgba(6, 182, 212, 0.6);
+    box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.1);
+    background: rgba(255, 255, 255, 1);
+  }
+
+  .custom-inline-input::placeholder {
+    color: #9ca3af;
+  }
+
+  /* Preview Minimal */
+  .preview-minimal {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    margin-top: 20px;
+    background: linear-gradient(135deg,
+      rgba(16, 185, 129, 0.08) 0%,
+      rgba(240, 248, 255, 0.5) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+  }
+
+  .preview-minimal-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+
+  .preview-minimal-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .preview-minimal-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .preview-minimal-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: #059669;
   }
 
   /* Preset Buttons - Enhanced Interactive Cards */
@@ -1252,6 +1466,31 @@
       font-size: 20px;
     }
 
+    .step-icon {
+      font-size: 40px;
+    }
+
+    .main-option-card {
+      padding: 16px;
+    }
+
+    .option-icon {
+      font-size: 32px;
+    }
+
+    .option-label {
+      font-size: 16px;
+    }
+
+    .option-value {
+      font-size: 13px;
+    }
+
+    .badge-popular-main {
+      font-size: 10px;
+      padding: 5px 10px;
+    }
+
     .preset-btn {
       padding: 14px;
     }
@@ -1276,6 +1515,18 @@
 
     .step-line {
       width: 60px;
+    }
+
+    .preview-minimal {
+      padding: 14px 16px;
+    }
+
+    .preview-minimal-icon {
+      font-size: 20px;
+    }
+
+    .preview-minimal-value {
+      font-size: 14px;
     }
   }
 

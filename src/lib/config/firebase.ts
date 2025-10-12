@@ -31,6 +31,7 @@ import {
   type Query,
   type Timestamp
 } from 'firebase/firestore';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { browser } from '$app/environment';
 import { authActions, authStore, userStore, userProfileStore } from '$stores/auth';
 import { get } from 'svelte/store';
@@ -50,12 +51,14 @@ const firebaseConfig = {
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
+let storage: FirebaseStorage;
 let googleProvider: GoogleAuthProvider;
 
 if (browser) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+  storage = getStorage(app);
 
   // Configure Google Provider
   googleProvider = new GoogleAuthProvider();
@@ -477,7 +480,7 @@ export const FirebaseUtils = {
 };
 
 // Export Firebase instances (only available in browser)
-export { app, auth, db, googleProvider };
+export { app, auth, db, storage, googleProvider };
 
 // Backward compatibility for existing vanilla JS code
 if (browser && typeof window !== 'undefined') {

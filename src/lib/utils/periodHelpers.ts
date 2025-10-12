@@ -298,12 +298,32 @@ export function getResetDatePresets() {
       value: 1,
       label: 'Awal bulan',
       description: 'Popular untuk gaji PNS',
+      shortDescription: 'Gaji PNS',
+      emoji: '📅',
+      popular: false
+    },
+    {
+      value: 5,
+      label: 'Tanggal 5',
+      description: 'Reset awal bulan',
+      shortDescription: 'Awal bulan',
+      emoji: '🗓️',
+      popular: false
+    },
+    {
+      value: 15,
+      label: 'Tanggal 15',
+      description: 'Tengah bulan',
+      shortDescription: 'Tengah bulan',
+      emoji: '📆',
       popular: false
     },
     {
       value: 25,
       label: 'Tanggal 25',
       description: 'Paling populer di Indonesia',
+      shortDescription: 'Gaji karyawan',
+      emoji: '💰',
       popular: true
     }
   ];

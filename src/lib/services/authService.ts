@@ -33,7 +33,7 @@ export class AuthService {
       authActions.setLoading(true);
       authActions.setError(null);
 
-      const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
+      const { signInWithPopup } = await import('firebase/auth');
       const { auth, googleProvider } = await import('$lib/config/firebase');
 
       const result = await signInWithPopup(auth, googleProvider);
@@ -133,6 +133,65 @@ export class AuthService {
   }
 
   /**
+   * Get user profile from Firestore
+   */
+  async getUserProfile(userId: string): Promise<UserProfile | null> {
+    if (!browser) return null;
+
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const { FirebaseUtils } = await import('$lib/config/firebase');
+
+      const userRef = FirebaseUtils.getUserProfileRef(userId);
+      const docSnap = await getDoc(userRef);
+
+      if (docSnap.exists()) {
+        return docSnap.data() as UserProfile;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error getting user profile:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Upload profile photo to Firebase Storage
+   */
+  async uploadProfilePhoto(file: File): Promise<{ success: boolean; photoURL?: string; error?: string }> {
+    if (!browser) {
+      return { success: false, error: 'Not in browser environment' };
+    }
+
+    try {
+      const user = await this.getCurrentUser();
+      if (!user) {
+        return { success: false, error: 'User not authenticated' };
+      }
+
+      // Import Firebase Storage
+      const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+      const { storage } = await import('$lib/config/firebase');
+
+      // Create a storage reference
+      const photoRef = ref(storage, `profile-photos/${user.uid}/${Date.now()}_${file.name}`);
+
+      // Upload the file
+      const snapshot = await uploadBytes(photoRef, file);
+
+      // Get the download URL
+      const downloadURL = await getDownloadURL(snapshot.ref);
+
+      return { success: true, photoURL: downloadURL };
+
+    } catch (error: any) {
+      console.error('Error uploading profile photo:', error);
+      return { success: false, error: error.message || 'Failed to upload photo' };
+    }
+  }
+
+  /**
    * Update user profile in Firestore
    */
   async updateUserProfile(profileData: Partial<UserProfile>): Promise<{ success: boolean; error?: string }> {
@@ -147,7 +206,7 @@ export class AuthService {
       }
 
       const { setDoc, serverTimestamp } = await import('firebase/firestore');
-      const { db, FirebaseUtils } = await import('$lib/config/firebase');
+      const { FirebaseUtils } = await import('$lib/config/firebase');
 
       const userRef = FirebaseUtils.getUserProfileRef(user.uid);
 

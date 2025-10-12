@@ -387,7 +387,7 @@ async function completeOnboarding() {
 
       {#if currentPeriod}
         <p class="choice-period">
-          Periode saat ini: {formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate)}
+          Periode Tracking: {formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate)}
         </p>
       {/if}
 

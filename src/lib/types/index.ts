@@ -16,6 +16,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   nickname?: string; // Custom nickname for personalization
+  role?: 'pns' | 'swasta' | 'freelancer' | 'custom'; // User's work role for tracking period
   onboardingComplete: boolean;
   currency: string;
   locale: string;

@@ -24,7 +24,7 @@
   let newCategoryData = {
     id: '',
     name: '',
-    emoji: '📦',
+    emoji: '💰',
     budget: 0
   };
   let categoryFormErrors = {
@@ -33,6 +33,247 @@
     budget: ''
   };
   let isSavingCategory = false;
+
+  // Emoji mapping dictionary for auto-generation (Indonesian + English)
+  const emojiMapping: Record<string, string> = {
+    // Food & Dining
+    'makanan': '🍽️',
+    'makan': '🍽️',
+    'food': '🍽️',
+    'foods': '🍽️',
+    'dining': '🍽️',
+    'restaurant': '🍽️',
+    'restoran': '🍽️',
+    'kuliner': '🍽️',
+    'jajan': '🍔',
+    'snack': '🍔',
+    'snacks': '🍔',
+    'breakfast': '🍳',
+    'sarapan': '🍳',
+    'lunch': '🍱',
+    'makan siang': '🍱',
+    'dinner': '🍝',
+    'makan malam': '🍝',
+    'kopi': '☕',
+    'coffee': '☕',
+    'cafe': '☕',
+    'minuman': '🥤',
+    'drink': '🥤',
+    'drinks': '🥤',
+    'groceries': '🛒',
+    'grocery': '🛒',
+    'belanja': '🛒',
+
+    // Transportation
+    'transport': '🚗',
+    'transportasi': '🚗',
+    'transportation': '🚗',
+    'bensin': '⛽',
+    'fuel': '⛽',
+    'gas': '⛽',
+    'parkir': '🅿️',
+    'parking': '🅿️',
+    'ojek': '🏍️',
+    'motor': '🏍️',
+    'motorcycle': '🏍️',
+    'mobil': '🚗',
+    'car': '🚗',
+    'taxi': '🚕',
+    'taksi': '🚕',
+    'bus': '🚌',
+    'kereta': '🚆',
+    'train': '🚆',
+    'pesawat': '✈️',
+    'plane': '✈️',
+    'flight': '✈️',
+    'travel': '✈️',
+
+    // Shopping
+    'belanja': '🛍️',
+    'shopping': '🛍️',
+    'shop': '🛍️',
+    'pakaian': '👕',
+    'clothing': '👕',
+    'clothes': '👕',
+    'fashion': '👗',
+    'baju': '👕',
+    'sepatu': '👟',
+    'shoes': '👟',
+    'gadget': '📱',
+    'elektronik': '📱',
+    'electronics': '📱',
+
+    // Entertainment
+    'hiburan': '🎬',
+    'entertainment': '🎬',
+    'nonton': '🎬',
+    'movie': '🎬',
+    'movies': '🎬',
+    'film': '🎬',
+    'bioskop': '🎬',
+    'cinema': '🎬',
+    'game': '🎮',
+    'games': '🎮',
+    'gaming': '🎮',
+    'musik': '🎵',
+    'music': '🎵',
+    'konser': '🎤',
+    'concert': '🎤',
+    'sport': '⚽',
+    'sports': '⚽',
+    'olahraga': '⚽',
+    'gym': '💪',
+    'fitness': '💪',
+
+    // Health & Medical
+    'kesehatan': '⚕️',
+    'health': '⚕️',
+    'medical': '⚕️',
+    'dokter': '👨‍⚕️',
+    'doctor': '👨‍⚕️',
+    'rumah sakit': '🏥',
+    'hospital': '🏥',
+    'obat': '💊',
+    'medicine': '💊',
+    'vitamin': '💊',
+    'farmasi': '💊',
+    'pharmacy': '💊',
+    'apotek': '💊',
+
+    // Education
+    'pendidikan': '📚',
+    'education': '📚',
+    'sekolah': '🎓',
+    'school': '🎓',
+    'kuliah': '🎓',
+    'university': '🎓',
+    'college': '🎓',
+    'kursus': '📖',
+    'course': '📖',
+    'training': '📖',
+    'buku': '📚',
+    'book': '📚',
+    'books': '📚',
+
+    // Bills & Utilities
+    'tagihan': '💡',
+    'bills': '💡',
+    'bill': '💡',
+    'utilities': '💡',
+    'listrik': '⚡',
+    'electricity': '⚡',
+    'air': '💧',
+    'water': '💧',
+    'internet': '🌐',
+    'wifi': '📶',
+    'telepon': '📞',
+    'phone': '📞',
+    'pulsa': '📱',
+
+    // Finance & Savings
+    'tabungan': '💰',
+    'savings': '💰',
+    'saving': '💰',
+    'investasi': '📈',
+    'investment': '📈',
+    'invest': '📈',
+    'saham': '📊',
+    'stock': '📊',
+    'stocks': '📊',
+    'crypto': '₿',
+    'cryptocurrency': '₿',
+    'asuransi': '🛡️',
+    'insurance': '🛡️',
+    'hutang': '💳',
+    'debt': '💳',
+    'loan': '💳',
+    'pinjaman': '💳',
+
+    // Personal Care
+    'perawatan': '💅',
+    'personal care': '💅',
+    'salon': '💇',
+    'haircut': '💇',
+    'potong rambut': '💇',
+    'spa': '💆',
+    'skincare': '🧴',
+    'makeup': '💄',
+    'kosmetik': '💄',
+
+    // Pets
+    'hewan': '🐾',
+    'pet': '🐾',
+    'pets': '🐾',
+    'kucing': '🐱',
+    'cat': '🐱',
+    'anjing': '🐶',
+    'dog': '🐶',
+
+    // Home & Living
+    'rumah': '🏠',
+    'home': '🏠',
+    'house': '🏠',
+    'furniture': '🛋️',
+    'furnitur': '🛋️',
+    'sewa': '🏘️',
+    'rent': '🏘️',
+    'rental': '🏘️',
+    'kos': '🏘️',
+
+    // Gifts & Donations
+    'hadiah': '🎁',
+    'gift': '🎁',
+    'gifts': '🎁',
+    'donasi': '🎗️',
+    'donation': '🎗️',
+    'charity': '🎗️',
+    'sedekah': '🎗️',
+    'zakat': '🕌',
+
+    // Other
+    'lainnya': '📋',
+    'other': '📋',
+    'others': '📋',
+    'miscellaneous': '📋',
+    'misc': '📋',
+    'lain': '📋'
+  };
+
+  // Function to auto-generate emoji based on category name
+  function autoGenerateEmoji(categoryName: string): string {
+    if (!categoryName || categoryName.trim() === '') {
+      return '💰'; // Default emoji
+    }
+
+    const normalizedName = categoryName.toLowerCase().trim();
+
+    // Direct match
+    if (emojiMapping[normalizedName]) {
+      return emojiMapping[normalizedName];
+    }
+
+    // Partial match - check if any keyword is contained in the category name
+    for (const [keyword, emoji] of Object.entries(emojiMapping)) {
+      if (normalizedName.includes(keyword) || keyword.includes(normalizedName)) {
+        return emoji;
+      }
+    }
+
+    // Default emoji if no match found
+    return '💰';
+  }
+
+  // Handler for category name input - auto-generate emoji
+  function handleCategoryNameInput(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const categoryName = target.value;
+
+    // Auto-generate emoji based on category name
+    newCategoryData.emoji = autoGenerateEmoji(categoryName);
+
+    // Clear previous name errors
+    categoryFormErrors.name = '';
+  }
 
   // Reactive icon display - using same icon that rotates with CSS
   $: buttonIcon = '+';
@@ -392,10 +633,11 @@
     }
 
     // Validate budget
-    if (!newCategoryData.budget || newCategoryData.budget <= 0) {
+    const budgetAmount = typeof newCategoryData.budget === 'number' ? newCategoryData.budget : 0;
+    if (!budgetAmount || budgetAmount <= 0) {
       categoryFormErrors.budget = 'Budget harus lebih dari 0';
       isValid = false;
-    } else if (newCategoryData.budget > 999999999) {
+    } else if (budgetAmount > 999999999) {
       categoryFormErrors.budget = 'Budget maksimal Rp 999.999.999';
       isValid = false;
     }
@@ -409,7 +651,7 @@
     newCategoryData = {
       id: '',
       name: '',
-      emoji: '📦',
+      emoji: '💰',
       budget: 0
     };
     categoryFormErrors = { name: '', emoji: '', budget: '' };
@@ -421,7 +663,7 @@
     newCategoryData = {
       id: '',
       name: '',
-      emoji: '📦',
+      emoji: '💰',
       budget: 0
     };
     categoryFormErrors = { name: '', emoji: '', budget: '' };
@@ -548,8 +790,40 @@
   }
 
   function formatCurrencyInput(amount: number): string {
-    if (!amount) return '';
+    if (!amount || amount === 0) return '';
     return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function parseCurrencyInput(formattedValue: string): number {
+    return parseInt(formattedValue.replace(/\./g, '') || '0', 10);
+  }
+
+  function handleBudgetAmountInput(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const value = target.value;
+
+    // Clean input: remove all non-digits
+    const cleanValue = value.replace(/[^\d]/g, '');
+
+    // Parse to number
+    const numericValue = parseInt(cleanValue || '0', 10);
+
+    // Format with dots as thousand separators
+    const formattedValue = cleanValue.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+    // Update input display
+    target.value = formattedValue;
+
+    // Update store with numeric value
+    newCategoryData.budget = numericValue;
+
+    // Clear previous budget errors
+    categoryFormErrors.budget = '';
+
+    // Validate budget
+    if (numericValue > 999999999) {
+      categoryFormErrors.budget = 'Budget maksimal Rp 999.999.999';
+    }
   }
 
   function formatCurrency(amount: number): string {
@@ -777,50 +1051,44 @@
           <div class="form-content">
             <div class="form-group">
               <label for="category-name">Category Name</label>
-              <input
-                id="category-name"
-                type="text"
-                class="glass-input"
-                class:error={categoryFormErrors.name}
-                bind:value={newCategoryData.name}
-                placeholder="e.g., Food, Transport"
-                disabled={isSavingCategory}
-              />
+              <div class="category-name-input-group">
+                <!-- Emoji display box (read-only, auto-generated) -->
+                <div class="emoji-display-box">
+                  <span class="emoji-display">{newCategoryData.emoji}</span>
+                </div>
+
+                <!-- Category name input -->
+                <input
+                  id="category-name"
+                  type="text"
+                  class="glass-input category-name-input"
+                  class:error={categoryFormErrors.name}
+                  bind:value={newCategoryData.name}
+                  on:input={handleCategoryNameInput}
+                  placeholder="e.g., Food, Transport"
+                  disabled={isSavingCategory}
+                />
+              </div>
               {#if categoryFormErrors.name}
                 <span class="error-message">{categoryFormErrors.name}</span>
               {/if}
             </div>
 
             <div class="form-group">
-              <label for="category-emoji">Emoji</label>
-              <input
-                id="category-emoji"
-                type="text"
-                class="glass-input"
-                class:error={categoryFormErrors.emoji}
-                bind:value={newCategoryData.emoji}
-                placeholder="📦"
-                maxlength="2"
-                disabled={isSavingCategory}
-              />
-              {#if categoryFormErrors.emoji}
-                <span class="error-message">{categoryFormErrors.emoji}</span>
-              {/if}
-            </div>
-
-            <div class="form-group">
               <label for="category-budget">Budget Amount</label>
-              <input
-                id="category-budget"
-                type="number"
-                class="glass-input"
-                class:error={categoryFormErrors.budget}
-                bind:value={newCategoryData.budget}
-                placeholder="0"
-                min="0"
-                max="999999999"
-                disabled={isSavingCategory}
-              />
+              <div class="currency-input-group">
+                <span class="currency-prefix">Rp</span>
+                <input
+                  id="category-budget"
+                  type="text"
+                  class="glass-input currency-input"
+                  class:error={categoryFormErrors.budget}
+                  value={formatCurrencyInput(newCategoryData.budget)}
+                  on:input={handleBudgetAmountInput}
+                  placeholder="0"
+                  disabled={isSavingCategory}
+                />
+              </div>
               {#if categoryFormErrors.budget}
                 <span class="error-message">{categoryFormErrors.budget}</span>
               {/if}
@@ -1202,6 +1470,26 @@
     transform: scale(1.1);
   }
 
+  /* Red style when form is expanded */
+  .add-category-btn.is-open {
+    background: linear-gradient(135deg,
+      rgba(239, 68, 68, 0.9) 0%,
+      rgba(220, 38, 38, 0.95) 100%);
+    box-shadow:
+      0 8px 32px rgba(239, 68, 68, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .add-category-btn.is-open:hover:not(:disabled) {
+    background: linear-gradient(135deg,
+      rgba(239, 68, 68, 1) 0%,
+      rgba(220, 38, 38, 1) 100%);
+    box-shadow:
+      0 12px 40px rgba(239, 68, 68, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+
   .add-category-btn.is-open .btn-icon {
     transform: rotate(45deg);
   }
@@ -1441,6 +1729,30 @@
     width: 100%;
     color: #0f172a;
     font-weight: 500;
+  }
+
+  .currency-input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .currency-prefix {
+    position: absolute;
+    left: 1rem;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.95rem;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .currency-input {
+    padding-left: 2.75rem;
+    text-align: right;
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.01em;
   }
 
   .glass-input::placeholder {
@@ -2029,6 +2341,84 @@
     font-size: 0.95rem;
   }
 
+  /* Category Name Input Group with Emoji Display */
+  .category-name-input-group {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .emoji-display-box {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.9) 0%,
+      rgba(240, 248, 255, 0.8) 100%);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(226, 232, 240, 0.8);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .emoji-display-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg,
+      rgba(0, 191, 255, 0.05) 0%,
+      rgba(30, 144, 255, 0.03) 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .category-name-input-group:hover .emoji-display-box {
+    border-color: rgba(0, 191, 255, 0.4);
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 1) 0%,
+      rgba(240, 248, 255, 0.95) 100%);
+  }
+
+  .category-name-input-group:hover .emoji-display-box::before {
+    opacity: 1;
+  }
+
+  .emoji-display {
+    font-size: 28px;
+    line-height: 1;
+    position: relative;
+    z-index: 1;
+    animation: emojiPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes emojiPop {
+    0% {
+      transform: scale(0.5);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .category-name-input {
+    flex: 1;
+    min-width: 0;
+  }
+
   .form-actions {
     display: flex;
     gap: 1rem;
@@ -2211,9 +2601,12 @@
 
     .add-category-btn {
       flex: 0 0 auto;
-      padding: 0.75rem 1rem;
+      padding: 0.75rem;
       font-size: 0.85rem;
       gap: 0.35rem;
+      border-radius: 8px;
+      width: 3rem;
+      height: 3rem;
     }
 
     .add-category-btn span:not(.btn-icon) {
@@ -2286,7 +2679,10 @@
     }
 
     .add-category-btn {
-      padding: 0.65rem 0.85rem;
+      padding: 0.65rem;
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: 6px;
     }
 
     .btn-icon {

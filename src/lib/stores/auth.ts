@@ -25,6 +25,8 @@ export interface UserProfile {
   currency: string;
   locale: string;
   budgetResetDate?: number;
+  budgetResetType?: 'fixed' | 'last-day-of-month';
+  hasBudgetSetup?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
