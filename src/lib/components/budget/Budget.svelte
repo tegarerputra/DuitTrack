@@ -5,15 +5,31 @@
   import { authService } from '../../services/authService';
   import { DataService } from '../../services/dataService';
   import { toastStore } from '../../stores/toast';
+  import { userProfileStore } from '../../stores/auth';
+  import { selectedPeriodStore } from '../../stores/period';
   import LoadingSkeleton from './LoadingSkeleton.svelte';
   import CategoryBudgetItem from './CategoryBudgetItem.svelte';
   import ToastContainer from '../ui/ToastContainer.svelte';
+  import PeriodSelector from '../dashboard/PeriodSelector.svelte';
 
   const dispatch = createEventDispatcher();
 
   // Internal state management
   let currentPeriodId = '';
   let userResetDate = 1;
+
+  // Subscribe to shared period store for cross-page persistence
+  selectedPeriodStore.subscribe((value) => {
+    if (value && value !== currentPeriodId) {
+      currentPeriodId = value;
+      console.log('📅 Budget: Period changed from store:', value);
+      // Reload dummy data when period changes from another page
+      if (currentPeriodId) {
+        loadDummyData();
+      }
+    }
+  });
+  let userProfile: any = null;
   let categories: any[] = [];
   let isLoading = false;
   let dataService: DataService | null = null;
@@ -310,11 +326,42 @@
 
   // Component initialization
   onMount(async () => {
+    // Setup period selector first to ensure currentPeriodId is set
+    await setupPeriodSelectorEarly();
+
+    // Then initialize the rest
     await initializeBudgetComponent();
 
-    // TEMPORARY: Load dummy data for development
-    loadDummyData();
+    // TEMPORARY: Load dummy data for development (currentPeriodId should be set by now)
+    if (currentPeriodId) {
+      loadDummyData();
+    } else {
+      console.error('❌ currentPeriodId not set, cannot load dummy data');
+    }
   });
+
+  // Setup period selector early to ensure currentPeriodId is set
+  async function setupPeriodSelectorEarly() {
+    try {
+      // Use default reset date if user profile not loaded yet
+      const resetDate = userResetDate || 25;
+      const periods = generatePeriodOptions(resetDate, 12);
+      availablePeriods.set(periods);
+
+      // DON'T set period here - let PeriodSelector handle it
+      // Just read from store if available
+      const storedPeriod = $selectedPeriodStore;
+      if (storedPeriod) {
+        currentPeriodId = storedPeriod;
+        selectedPeriod.set(currentPeriodId);
+        console.log('✅ Budget: Using stored period from store:', currentPeriodId);
+      } else {
+        console.log('📅 Budget: Waiting for PeriodSelector to set period');
+      }
+    } catch (error) {
+      console.error('❌ Error setting up early period selector:', error);
+    }
+  }
 
   async function initializeBudgetComponent() {
     try {
@@ -343,13 +390,36 @@
     if (!dataService) return;
 
     try {
-      const userProfile = await dataService.getUserProfile();
-      userResetDate = userProfile?.budgetResetDate || 1;
+      // Subscribe to user profile store
+      userProfileStore.subscribe(profile => {
+        if (profile) {
+          userProfile = profile;
+          userResetDate = profile.budgetResetDate || 25;
+        }
+      });
+
+      const fetchedProfile = await dataService.getUserProfile();
+      userResetDate = fetchedProfile?.budgetResetDate || 25;
       console.log('📅 Budget component loaded user reset date:', userResetDate);
     } catch (error) {
       console.error('Error loading user settings:', error);
-      userResetDate = 1; // Fallback to default
+      userResetDate = 25; // Fallback to default
     }
+  }
+
+  // Handle period change from PeriodSelector
+  function handlePeriodChangeFromSelector(event: CustomEvent<{ periodId: string }>) {
+    const newPeriodId = event.detail.periodId;
+    console.log(`🔄 Budget switching to period: ${newPeriodId}`);
+    currentPeriodId = newPeriodId;
+    selectedPeriod.set(currentPeriodId);
+    selectedPeriodStore.set(currentPeriodId); // Save to shared store for cross-page persistence
+
+    // TEMPORARY: Load dummy data for the new period (same as Dashboard)
+    loadDummyData();
+
+    // DISABLED: Real data loading (will be re-enabled in production)
+    // loadBudgetData();
   }
 
   async function setupPeriodSelector() {
@@ -358,12 +428,16 @@
       const periods = generatePeriodOptions(userResetDate, 12);
       availablePeriods.set(periods);
 
-      // Set current period
-      const currentPeriod = periods.find(p => p.isCurrent);
-      currentPeriodId = currentPeriod?.id || periods[0]?.id || '';
-      selectedPeriod.set(currentPeriodId);
-
-      console.log('✅ Budget period selector setup complete. Period ID:', currentPeriodId);
+      // DON'T set period here - let PeriodSelector handle it
+      // Just read from store if available
+      const storedPeriod = $selectedPeriodStore;
+      if (storedPeriod) {
+        currentPeriodId = storedPeriod;
+        selectedPeriod.set(currentPeriodId);
+        console.log('✅ Budget: Period selector using stored period:', currentPeriodId);
+      } else {
+        console.log('📅 Budget: Period selector waiting for PeriodSelector');
+      }
     } catch (error) {
       console.error('❌ Error setting up period selector:', error);
     }
@@ -853,15 +927,15 @@
 
   async function loadDummyData() {
     // Import centralized dummy data
-    const { getDummyCategories, generateDummyExpenses } = await import('$lib/utils/dummyData');
+    const { getDummyCategories, generateDummyExpensesForPeriod } = await import('$lib/utils/dummyData');
 
-    // Get expenses from store/cache (same data as Dashboard & Expenses)
-    const expenses = generateDummyExpenses(25);
+    // IMPORTANT: Use period-specific expenses to sync with Dashboard
+    const expenses = generateDummyExpensesForPeriod(currentPeriodId, 25);
 
     // Calculate spent per category from actual expenses
     const categorySpending: Record<string, number> = {};
     expenses.forEach((expense: any) => {
-      const categoryId = expense.category.toLowerCase();
+      const categoryId = expense.category.toUpperCase(); // ✅ Match UPPERCASE category IDs
       categorySpending[categoryId] = (categorySpending[categoryId] || 0) + expense.amount;
     });
 
@@ -871,7 +945,7 @@
     // Combine budget with REAL spending from expenses
     categories = dummyCategories.map(cat => ({
       ...cat,
-      spent: categorySpending[cat.id] || 0  // Use real spending from expenses
+      spent: categorySpending[cat.id] || 0  // Use real spending from expenses (cat.id is UPPERCASE)
     }));
 
     // Calculate totals
@@ -886,8 +960,9 @@
       totalSpent
     });
 
-    console.log('📊 Dummy budget data loaded (using shared store expenses)');
+    console.log(`📊 Budget dummy data loaded for period: ${currentPeriodId}`);
     console.log('💰 Budget total spent:', totalSpent);
+    console.log('📈 Category spending:', categorySpending);
   }
 </script>
 
@@ -903,13 +978,12 @@
       </div>
 
       <!-- Period Selector -->
-      <div class="period-selector">
-        <div class="period-label">Periode Tracking</div>
-        <div class="period-card">
-          <span class="period-icon">📅</span>
-          <span class="period-text">{$selectedPeriod || currentPeriodId}</span>
-          <span class="period-arrow">▼</span>
-        </div>
+      <div class="header-actions">
+        <PeriodSelector
+          currentPeriodId={currentPeriodId}
+          userResetDate={userResetDate}
+          on:periodChange={handlePeriodChangeFromSelector}
+        />
       </div>
     </div>
   </div>
@@ -1205,50 +1279,11 @@
     filter: drop-shadow(0 2px 4px rgba(31, 41, 55, 0.1));
   }
 
-  /* Period Selector */
-  .period-selector {
+  /* Period Selector - Removed old styles, now handled by PeriodSelector component */
+  .header-actions {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .period-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .period-card {
-    display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
-    padding: 12px 16px;
-    background: linear-gradient(135deg, rgba(6, 182, 212, 0.05), rgba(6, 182, 212, 0.02));
-    border-radius: 12px;
-    border: 1px solid rgba(6, 182, 212, 0.1);
-    cursor: pointer;
-    transition: all 0.3s ease;
-    width: 100%;
-  }
-
-  .period-card:hover {
-    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.15);
-  }
-
-  .period-icon {
-    font-size: 18px;
-  }
-
-  .period-text {
-    font-weight: 600;
-    color: #0891B2;
-  }
-
-  .period-arrow {
-    margin-left: auto;
-    color: #6b7280;
   }
 
   /* Budget Content Grid - Wrapper for content after header */
@@ -1517,21 +1552,12 @@
       flex: 0 0 auto;
     }
 
-    .period-selector {
+    .header-actions {
       flex: 0 0 auto;
       align-items: flex-end;
       text-align: right;
       min-width: 200px;
-    }
-
-    .period-label {
-      text-align: right;
-    }
-
-    .period-card {
-      width: auto;
-      min-width: 180px;
-      justify-content: center;
+      max-width: 280px;
     }
   }
 
@@ -1575,22 +1601,8 @@
       font-size: 1.5rem;
     }
 
-    .period-selector {
-      margin-top: 0.5rem;
-    }
-
-    .period-label {
-      font-size: 0.75rem;
-      margin-bottom: 0.4rem;
-    }
-
-    .period-card {
-      padding: 0.6rem 0.8rem;
-      font-size: 0.8rem;
-    }
-
-    .period-icon {
-      font-size: 0.9rem;
+    .header-actions {
+      width: 100%;
     }
 
     .categories-header {
@@ -2497,7 +2509,7 @@
   }
 
   /* Enhanced focus states for accessibility */
-  .period-selector:focus,
+  /* Removed period-selector focus style */
   .add-category-btn:focus,
   .btn-secondary:focus,
   .btn-primary:focus {
@@ -2519,22 +2531,8 @@
       font-size: 1.5rem;
     }
 
-    .period-selector {
-      margin-top: 0.5rem;
-    }
-
-    .period-label {
-      font-size: 0.75rem;
-      margin-bottom: 0.4rem;
-    }
-
-    .period-card {
-      padding: 0.6rem 0.8rem;
-      font-size: 0.8rem;
-    }
-
-    .period-icon {
-      font-size: 0.9rem;
+    .header-actions {
+      width: 100%;
     }
 
     .budget-content-grid {
@@ -2737,21 +2735,12 @@
       flex: 0 0 auto;
     }
 
-    .period-selector {
+    .header-actions {
       flex: 0 0 auto;
       align-items: flex-end;
       text-align: right;
       min-width: 200px;
-    }
-
-    .period-label {
-      text-align: right;
-    }
-
-    .period-card {
-      width: auto;
-      min-width: 180px;
-      justify-content: center;
+      max-width: 280px;
     }
   }
 

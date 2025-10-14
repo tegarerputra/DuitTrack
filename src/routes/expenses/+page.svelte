@@ -15,6 +15,9 @@
   } from '../../lib/stores/expenses';
   import { budgetStore, budgetCategoriesStore } from '../../lib/stores/budget';
   import InlineCategorySelector from '../../lib/components/expense/InlineCategorySelector.svelte';
+  import PeriodSelector from '$lib/components/dashboard/PeriodSelector.svelte';
+  import { userProfileStore } from '$stores/auth';
+  import { selectedPeriodStore } from '$lib/stores/period';
 
   // Navigation context
   let returnPath = '';
@@ -25,6 +28,7 @@
   let isLoading = false;
   let showChart = true;
   let currentPeriodId = '';
+  let userProfile: any = null;
 
   // Chart data
   let chartData: any[] = [];
@@ -35,21 +39,43 @@
   // Undo functionality
   let undoStack: Array<{ expenseId: string; oldCategory: string; newCategory: string }> = [];
 
+  // Subscribe to shared period store for cross-page persistence
+  selectedPeriodStore.subscribe((value) => {
+    if (value && value !== currentPeriodId) {
+      currentPeriodId = value;
+      console.log('📅 Expenses: Period changed from store:', value);
+      // loadExpensesData will be triggered by the reactive statement
+    }
+  });
+
   onMount(() => {
+    // Check if there's a stored period in the shared store
+    const storedPeriod = $selectedPeriodStore;
+    if (storedPeriod) {
+      currentPeriodId = storedPeriod;
+      console.log('📅 Expenses: Using stored period:', storedPeriod);
+    } else {
+      console.log('📅 Expenses: Waiting for PeriodSelector to set period');
+    }
+
+    // Subscribe to user profile
+    userProfileStore.subscribe(profile => {
+      if (profile) {
+        userProfile = profile;
+        // DON'T set period here - let PeriodSelector handle it
+      }
+    });
+
     // Get URL parameters
     selectedCategory = $page.url.searchParams.get('category') || '';
     returnPath = $page.url.searchParams.get('return') || 'dashboard';
-
-    // Initialize current period
-    updateCurrentPeriod();
 
     // Initialize filters
     if (selectedCategory) {
       expenseActions.setCategoryFilter(selectedCategory);
     }
 
-    // Load data
-    loadExpensesData();
+    // Load categories
     loadCategories();
 
     // Add click outside handler
@@ -69,11 +95,36 @@
     };
   });
 
+  function updateCurrentPeriodFlexible(profile: any) {
+    const today = new Date();
+    const resetDate = profile.budgetResetDate || 25;
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+    const day = today.getDate();
+
+    // If today is before reset date, use previous month's period
+    if (day < resetDate) {
+      const prevMonth = month === 1 ? 12 : month - 1;
+      const prevYear = month === 1 ? year - 1 : year;
+      currentPeriodId = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(resetDate).padStart(2, '0')}`;
+    } else {
+      currentPeriodId = `${year}-${String(month).padStart(2, '0')}-${String(resetDate).padStart(2, '0')}`;
+    }
+    selectedPeriodStore.set(currentPeriodId); // Save to shared store
+  }
+
   function updateCurrentPeriod() {
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth() + 1;
-    currentPeriodId = `${year}-${String(month).padStart(2, '0')}`;
+    const day = 25; // Default reset date
+    currentPeriodId = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    selectedPeriodStore.set(currentPeriodId); // Save to shared store
+  }
+
+  // Watch for currentPeriodId changes to reload data
+  $: if (currentPeriodId) {
+    loadExpensesData();
   }
 
   // Subscribe to stores
@@ -84,15 +135,27 @@
   async function loadExpensesData() {
     expenseActions.setLoading(true);
 
-    // TEMPORARY: Load dummy data for development
+    // TEMPORARY: Load dummy data for development with period support
     setTimeout(async () => {
-      const { generateDummyExpenses } = await import('$lib/utils/dummyData');
-      // This will use cached/store data if available
-      generateDummyExpenses(25);
+      const { generateDummyExpensesForPeriod } = await import('$lib/utils/dummyData');
+      // Generate expenses for the selected period
+      const periodExpenses = generateDummyExpensesForPeriod(currentPeriodId, 25);
+
+      // Set expenses in store
+      expenseActions.setExpenses(periodExpenses);
       expenseActions.setLoading(false);
 
-      console.log('📊 Dummy expenses loaded for Expenses page (using shared store)');
+      console.log(`📊 Dummy expenses loaded for Expenses page - Period: ${currentPeriodId}`);
     }, 800);
+  }
+
+  // Handle period change from PeriodSelector
+  function handlePeriodChange(event: CustomEvent<{ periodId: string }>) {
+    const newPeriodId = event.detail.periodId;
+    console.log(`🔄 Switching to period: ${newPeriodId}`);
+    currentPeriodId = newPeriodId;
+    selectedPeriodStore.set(currentPeriodId); // Save to shared store for cross-page persistence
+    // loadExpensesData will be triggered by the reactive statement
   }
 
   async function loadCategories() {
@@ -316,13 +379,12 @@
       </div>
 
       <!-- Period Selector -->
-      <div class="period-selector">
-        <div class="period-label">Periode Tracking</div>
-        <div class="period-card">
-          <span class="period-icon">📅</span>
-          <span class="period-text">{currentPeriodId || '2025-09'}</span>
-          <span class="period-arrow">▼</span>
-        </div>
+      <div class="header-actions">
+        <PeriodSelector
+          currentPeriodId={currentPeriodId}
+          userResetDate={userProfile?.budgetResetDate || 25}
+          on:periodChange={handlePeriodChange}
+        />
       </div>
     </div>
   </div>
@@ -587,40 +649,12 @@
     filter: drop-shadow(0 2px 4px rgba(31, 41, 55, 0.1));
   }
 
-  .period-selector {
+  /* Period Selector - Removed old styles, now handled by PeriodSelector component */
+  .header-actions {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .period-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .period-card {
-    display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
-    padding: 12px 16px;
-    background: linear-gradient(135deg, rgba(6, 182, 212, 0.05), rgba(6, 182, 212, 0.02));
-    border-radius: 12px;
-    border: 1px solid rgba(6, 182, 212, 0.1);
-    cursor: pointer;
-    transition: all 0.3s ease;
-    width: 100%;
   }
-
-  .period-card:hover {
-    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.15);
-  }
-
-  .period-icon { font-size: 18px; }
-  .period-text { font-weight: 600; color: #0891B2; }
-  .period-arrow { margin-left: auto; color: #6b7280; }
 
   /* Main Grid Layout */
   .expenses-grid {
@@ -1472,22 +1506,8 @@
       font-size: 1.5rem;
     }
 
-    .period-selector {
-      margin-top: 0.5rem;
-    }
-
-    .period-label {
-      font-size: 0.75rem;
-      margin-bottom: 0.4rem;
-    }
-
-    .period-card {
-      padding: 0.6rem 0.8rem;
-      font-size: 0.8rem;
-    }
-
-    .period-icon {
-      font-size: 0.9rem;
+    .header-actions {
+      width: 100%;
     }
 
 
@@ -1632,21 +1652,12 @@
       flex: 0 0 auto;
     }
 
-    .period-selector {
+    .header-actions {
       flex: 0 0 auto;
       align-items: flex-end;
       text-align: right;
       min-width: 200px;
-    }
-
-    .period-label {
-      text-align: right;
-    }
-
-    .period-card {
-      width: auto;
-      min-width: 180px;
-      justify-content: center;
+      max-width: 280px;
     }
   }
 </style>

@@ -3,8 +3,7 @@
   import UserProfileComponent from '$components/auth/UserProfile.svelte';
   import { goto } from '$app/navigation';
   import { authService } from '$lib/services/authService';
-  import { userProfileStore } from '$stores/auth';
-  import { generatePeriods, formatPeriodDisplay, getResetDatePresets, type PeriodGeneratorConfig } from '$lib/utils/periodHelpers';
+  import { generatePeriods, formatPeriodDisplay, type PeriodGeneratorConfig } from '$lib/utils/periodHelpers';
   import { fade, fly } from 'svelte/transition';
   import toast from 'svelte-french-toast';
 
@@ -19,7 +18,14 @@
   let selectedRole: 'pns' | 'swasta' | 'freelancer' | 'custom' | null = null; // Track which role is selected
 
   // Role-based period tracking options
-  const roleOptions = [
+  const roleOptions: Array<{
+    id: 'pns' | 'swasta' | 'freelancer' | 'custom';
+    icon: string;
+    label: string;
+    description: string;
+    resetDay: number | null;
+    popular: boolean;
+  }> = [
     {
       id: 'pns',
       icon: '👔',
@@ -53,8 +59,6 @@
       popular: false
     }
   ];
-
-  const presetOptions = getResetDatePresets();
 
   // Default preferences for new users
   const defaultPreferences = {
@@ -169,11 +173,6 @@
     }
   }
 
-  // Handler to go back to tracking setup
-  function backToTrackingSetup() {
-    step2State = 'tracking-setup';
-  }
-
   // Handler: User chooses to setup budget now (instant redirect, data already saved)
   function setupBudgetNow() {
     // Show success toast
@@ -200,22 +199,6 @@
     setTimeout(() => {
       goto('/dashboard');
     }, 300);
-  }
-
-  function handlePresetSelect(value: number) {
-    selectedResetDate = value;
-    resetType = 'fixed';
-    showCustomInput = false;
-  }
-
-  function handleLastDaySelect() {
-    resetType = 'last-day-of-month';
-    showCustomInput = false;
-  }
-
-  function handleCustomInput() {
-    showCustomInput = true;
-    resetType = 'fixed';
   }
 
   // Role selection handler - automatically sets period based on role
@@ -259,7 +242,7 @@
   <meta name="description" content="Setup your DuitTrack account - configure budget categories and preferences." />
 </svelte:head>
 
-<AuthGuard requireAuth={true} redirectTo="/" let:user let:isAuthenticated>
+<AuthGuard requireAuth={true} redirectTo="/" let:user>
   <div class="onboarding-container">
     <div class="max-w-2xl mx-auto px-4 py-8">
 
@@ -987,210 +970,6 @@
     color: #059669;
   }
 
-  /* Preset Buttons - Enhanced Interactive Cards */
-  .preset-btn {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px;
-    border-radius: 12px;
-    background: linear-gradient(135deg,
-      rgba(255, 255, 255, 0.5) 0%,
-      rgba(240, 248, 255, 0.4) 100%);
-    backdrop-filter: blur(20px) saturate(1.5);
-    -webkit-backdrop-filter: blur(20px) saturate(1.5);
-    border: 1px solid rgba(6, 182, 212, 0.15);
-    box-shadow: 0 4px 12px rgba(0, 191, 255, 0.04);
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    text-align: left;
-    width: 100%;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .preset-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.1), transparent);
-    transition: left 0.5s ease;
-  }
-
-  .preset-btn:hover::before {
-    left: 100%;
-  }
-
-  .preset-btn:hover {
-    transform: translateY(-4px) scale(1.02);
-    border-color: rgba(6, 182, 212, 0.3);
-    box-shadow: 0 12px 32px rgba(0, 191, 255, 0.1);
-    background: linear-gradient(135deg,
-      rgba(240, 248, 255, 0.7) 0%,
-      rgba(248, 252, 255, 0.5) 100%);
-  }
-
-  .preset-btn.active {
-    border: 2px solid rgba(6, 182, 212, 0.5);
-    background: linear-gradient(135deg,
-      rgba(6, 182, 212, 0.15) 0%,
-      rgba(240, 248, 255, 0.6) 100%);
-    box-shadow: 0 8px 24px rgba(6, 182, 212, 0.15);
-    transform: translateY(-2px) scale(1.01);
-  }
-
-  .preset-icon {
-    font-size: 28px;
-    flex-shrink: 0;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
-  }
-
-  .preset-label {
-    font-weight: 700;
-    color: #1f2937;
-    font-size: 16px;
-    margin-bottom: 4px;
-  }
-
-  .preset-description {
-    font-size: 13px;
-    color: #6b7280;
-    line-height: 1.4;
-  }
-
-  .badge-popular {
-    background: linear-gradient(135deg, #f59e0b, #f97316);
-    color: white;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-    white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
-  }
-
-  /* Custom Input Box */
-  .custom-input-box {
-    padding: 20px;
-    background: rgba(6, 182, 212, 0.05);
-    border: 1px solid rgba(6, 182, 212, 0.2);
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
-  }
-
-  .custom-input-label {
-    display: block;
-    font-size: 14px;
-    font-weight: 600;
-    color: #4b5563;
-    margin-bottom: 12px;
-  }
-
-  .custom-input {
-    width: 100%;
-    padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid rgba(6, 182, 212, 0.2);
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    color: #1f2937;
-    backdrop-filter: blur(10px);
-    transition: all 0.2s ease;
-  }
-
-  .custom-input:focus {
-    outline: none;
-    border-color: rgba(6, 182, 212, 0.5);
-    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
-  }
-
-  .custom-input::placeholder {
-    color: #9ca3af;
-  }
-
-  /* Preview Info - Simplified Minimal Style */
-  .preview-info {
-    padding: 16px 20px;
-    margin-top: 16px;
-    margin-bottom: 12px;
-    border-radius: 10px;
-    background: rgba(6, 182, 212, 0.04);
-    border: none;
-    backdrop-filter: none;
-  }
-
-  .preview-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #6b7280;
-    margin-bottom: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-
-  .preview-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 12px 0;
-  }
-
-  .preview-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 6px 0;
-    font-size: 14px;
-    line-height: 1.5;
-  }
-
-  .preview-bullet {
-    color: #0891B2;
-    font-size: 16px;
-    line-height: 1.5;
-    flex-shrink: 0;
-  }
-
-  .preview-text {
-    color: #4b5563;
-    font-weight: 500;
-    flex: 1;
-  }
-
-  .preview-badge {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 2px 8px;
-    background: linear-gradient(135deg, #10b981, #059669);
-    color: white;
-    border-radius: 8px;
-    font-size: 10px;
-    font-weight: 700;
-    vertical-align: middle;
-  }
-
-  .preview-reset {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-top: 8px;
-    margin-top: 8px;
-    border-top: 1px solid rgba(6, 182, 212, 0.1);
-  }
-
-  .preview-reset-icon {
-    font-size: 14px;
-  }
-
-  .preview-reset-text {
-    font-size: 13px;
-    color: #6b7280;
-    font-weight: 500;
-  }
-
   /* Buttons - Enhanced with Pulse Animation */
   @keyframes pulse {
     0%, 100% {
@@ -1239,11 +1018,6 @@
 
   .primary-button:active:not(.loading):not(:disabled) {
     transform: translateY(-1px);
-  }
-
-  .primary-button.loading {
-    opacity: 0.7;
-    cursor: not-allowed;
   }
 
   .button-content {
@@ -1317,35 +1091,6 @@
     color: #1f2937;
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(6, 182, 212, 0.1);
-  }
-
-  .skip-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: #6b7280;
-    font-weight: 600;
-    padding: 10px 20px;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-    border: 1px solid transparent;
-  }
-
-  .skip-button:hover:not(:disabled) {
-    color: #0891B2;
-    background: rgba(6, 182, 212, 0.08);
-    border-color: rgba(6, 182, 212, 0.2);
-    transform: translateY(-1px);
-  }
-
-  .skip-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .skip-icon {
-    font-size: 14px;
   }
 
   /* Nickname Input Section */
@@ -1491,18 +1236,6 @@
       padding: 5px 10px;
     }
 
-    .preset-btn {
-      padding: 14px;
-    }
-
-    .preset-icon {
-      font-size: 24px;
-    }
-
-    .preset-label {
-      font-size: 15px;
-    }
-
     .progress-steps {
       margin-bottom: 24px;
     }
@@ -1642,14 +1375,6 @@
     color: #1f2937;
     text-align: center;
     margin-bottom: 8px;
-  }
-
-  .choice-info {
-    font-size: 15px;
-    font-weight: 600;
-    color: #0891B2;
-    text-align: center;
-    margin-bottom: 4px;
   }
 
   .choice-period {

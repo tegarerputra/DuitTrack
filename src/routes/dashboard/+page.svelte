@@ -4,6 +4,7 @@
   import { authStore, userStore, userProfileStore } from '$stores/auth';
   import { budgetStore } from '$stores/budget';
   import { expenseStore } from '$stores/expenses';
+  import { selectedPeriodStore } from '$lib/stores/period';
   import { goto } from '$app/navigation';
   import { formatRupiah } from '$utils/index';
   import {
@@ -39,12 +40,21 @@
   import FintechButton from '$lib/components/ui/FintechButton.svelte';
   import FintechProgress from '$lib/components/ui/FintechProgress.svelte';
   import FinancialHeroCard from '$lib/components/dashboard/FinancialHeroCard_Final.svelte';
+  import PeriodSelector from '$lib/components/dashboard/PeriodSelector.svelte';
 
   // Dashboard state
   let error: string | null = null;
   let user: FirebaseUser | null = null;
   let userProfile: UserProfile | null = null;
   let currentPeriodId = '';
+
+  // Subscribe to shared period store
+  selectedPeriodStore.subscribe((value) => {
+    if (value && value !== currentPeriodId) {
+      currentPeriodId = value;
+      console.log('📅 Dashboard: Period changed from store:', value);
+    }
+  });
 
   // Dual-mode support
   let hasBudgetSetup = false;
@@ -117,12 +127,8 @@
           // Check budget setup status (will be re-checked after budget data loads)
           hasBudgetSetup = checkBudgetSetup(profile, budgetData);
 
-          // Update period based on user's reset date
-          if (profile.budgetResetDate !== undefined) {
-            updateCurrentPeriodFlexible(profile);
-          } else {
-            updateCurrentPeriod();
-          }
+          // DON'T set period here - let PeriodSelector handle it
+          console.log('📅 Dashboard: Waiting for PeriodSelector to set period');
         }
       });
 
@@ -154,6 +160,9 @@
     currentPeriod = periods.find(p => p.isActive) || periods[0];
     currentPeriodId = currentPeriod.id;
 
+    // Save to shared store for cross-page persistence
+    selectedPeriodStore.set(currentPeriodId);
+
     console.log('📅 Current period:', formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate));
   }
 
@@ -170,6 +179,9 @@
     };
     const periods = generatePeriods(config, 3);
     currentPeriod = periods.find(p => p.isActive) || periods[0];
+
+    // Save to shared store for cross-page persistence
+    selectedPeriodStore.set(currentPeriodId);
 
     console.log('📅 Using default monthly period:', formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate));
   }
@@ -195,10 +207,10 @@
 
   async function loadDummyData() {
     // Import centralized dummy data
-    const { getDummyBudgetData, generateDummyExpenses } = await import('$lib/utils/dummyData');
+    const { getDummyBudgetDataForPeriod, generateDummyExpensesForPeriod } = await import('$lib/utils/dummyData');
 
-    // Load expenses - this will use store/cache if available
-    expenses = generateDummyExpenses(25);
+    // Load expenses for the selected period
+    expenses = generateDummyExpensesForPeriod(currentPeriodId, 25);
 
     // Calculate REAL total from expenses
     const realTotalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -210,8 +222,8 @@
       categorySpending[categoryId] = (categorySpending[categoryId] || 0) + expense.amount;
     });
 
-    // Load budget data with REAL spent amount per category
-    const budgetDummyData = getDummyBudgetData();
+    // Load budget data with REAL spent amount per category for this period
+    const budgetDummyData = getDummyBudgetDataForPeriod(currentPeriodId, expenses);
 
     // Update categories with REAL spending from expenses
     const categoriesWithSpending = Object.fromEntries(
@@ -238,10 +250,19 @@
     calculateExpenseMetrics();
     loading = false;
 
-    console.log('📊 Dummy data loaded for Dashboard (using shared store)');
+    console.log(`📊 Dummy data loaded for Dashboard - Period: ${currentPeriodId}`);
     console.log('💰 Real total spent:', realTotalSpent);
     console.log('📊 Category spending:', categorySpending);
     console.log('✅ Budget setup detected:', hasBudgetSetup);
+  }
+
+  // Handle period change from PeriodSelector
+  function handlePeriodChange(event: CustomEvent<{ periodId: string }>) {
+    const newPeriodId = event.detail.periodId;
+    console.log(`🔄 Switching to period: ${newPeriodId}`);
+    currentPeriodId = newPeriodId;
+    selectedPeriodStore.set(currentPeriodId); // Save to shared store for cross-page persistence
+    // loadDashboardData will be triggered by the reactive statement
   }
 
   function calculateBudgetMetrics() {
@@ -425,14 +446,11 @@
 
             <!-- Period Selector -->
             <div class="header-actions">
-              <div class="period-selector">
-                <div class="period-label">Periode Tracking</div>
-                <div class="period-card">
-                  <span class="period-icon">📅</span>
-                  <span class="period-text">{currentPeriodId}</span>
-                  <span class="period-arrow">▼</span>
-                </div>
-              </div>
+              <PeriodSelector
+                currentPeriodId={currentPeriodId}
+                userResetDate={userProfile?.budgetResetDate || 25}
+                on:periodChange={handlePeriodChange}
+              />
             </div>
           </div>
         </div>
@@ -758,52 +776,7 @@
     gap: 12px;
   }
 
-  /* Period Selector */
-  .period-selector {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex: 1;
-  }
-
-  .period-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .period-card {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: linear-gradient(135deg, rgba(6, 182, 212, 0.05), rgba(6, 182, 212, 0.02));
-    border-radius: 12px;
-    border: 1px solid rgba(6, 182, 212, 0.1);
-    cursor: pointer;
-    transition: all 0.3s ease;
-    width: 100%;
-  }
-
-  .period-card:hover {
-    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.15);
-  }
-
-  .period-icon {
-    font-size: 18px;
-  }
-
-  .period-text {
-    font-weight: 600;
-    color: #0891B2;
-  }
-
-  .period-arrow {
-    margin-left: auto;
-    color: #6b7280;
-  }
+  /* Period Selector - Removed old styles, now handled by PeriodSelector component */
 
   /* HERO CARD - The Star of the Show! */
   /* Hero budget card - restored working version */
@@ -1863,22 +1836,8 @@
       font-size: 1.5rem;
     }
 
-    .period-selector {
-      margin-top: 0.5rem;
-    }
-
-    .period-label {
-      font-size: 0.75rem;
-      margin-bottom: 0.4rem;
-    }
-
-    .period-card {
-      padding: 0.6rem 0.8rem;
-      font-size: 0.8rem;
-    }
-
-    .period-icon {
-      font-size: 0.9rem;
+    .header-actions {
+      width: 100%;
     }
 
     .dashboard-container {
@@ -1910,21 +1869,12 @@
       flex: 0 0 auto;
     }
 
-    .period-selector {
+    .header-actions {
       flex: 0 0 auto;
       align-items: flex-end;
       text-align: right;
       min-width: 200px;
-    }
-
-    .period-label {
-      text-align: right;
-    }
-
-    .period-card {
-      width: auto;
-      min-width: 180px;
-      justify-content: center;
+      max-width: 280px;
     }
   }
 
