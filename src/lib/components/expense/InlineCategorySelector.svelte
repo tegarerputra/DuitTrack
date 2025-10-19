@@ -2,19 +2,45 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
+  import Portal from '$lib/components/ui/Portal.svelte';
+  import { getCategoryIcon, formatCategoryName } from '$lib/utils/categoryHelpers';
 
   export let currentCategory: string;
   export let categories: Array<{ value: string; label: string; icon: string }> = [];
+  export let isOpen: boolean = false; // Controlled by parent component
 
   const dispatch = createEventDispatcher();
 
-  let isOpen = false; // Start closed, only open when category display is clicked
   let dropdownElement: HTMLDivElement;
+  let categoryDisplayElement: HTMLButtonElement;
+  let dropdownStyle = '';
 
-  // Handle category display click - toggle dropdown
+  // Calculate dropdown position only when opened
+  $: if (isOpen && categoryDisplayElement) {
+    // Calculate position immediately without animation frame to prevent scroll
+    const rect = categoryDisplayElement.getBoundingClientRect();
+    dropdownStyle = `
+      position: fixed;
+      top: ${rect.bottom + 4}px;
+      left: ${rect.left}px;
+      width: ${rect.width}px;
+    `;
+  }
+
+  // Handle category display click - toggle dropdown via parent
   function handleCategoryDisplayClick(event: Event) {
     event.stopPropagation();
-    isOpen = !isOpen;
+    event.stopImmediatePropagation();
+
+    // Dispatch toggle event to parent
+    dispatch('toggle');
+
+    // Set flags to prevent handleClickOutside and handleScroll from closing immediately
+    if (!isOpen) {
+      justOpened = true;
+      // Ignore scroll events for 300ms after opening dropdown
+      ignoreScrollUntil = Date.now() + 300;
+    }
   }
 
   function handleCategorySelect(categoryValue: string, event: Event) {
@@ -24,67 +50,71 @@
     }
   }
 
-  function getCategoryIcon(category: string): string {
-    const icons: Record<string, string> = {
-      'FOOD': '🍽️',
-      'food': '🍽️',
-      'TRANSPORT': '🚗',
-      'transport': '🚗',
-      'SHOPPING': '🛍️',
-      'shopping': '🛍️',
-      'ENTERTAINMENT': '🎬',
-      'entertainment': '🎬',
-      'HEALTH': '💊',
-      'health': '💊',
-      'EDUCATION': '📚',
-      'education': '📚',
-      'UTILITIES': '⚡',
-      'utilities': '⚡',
-      'SAVINGS': '💰',
-      'savings': '💰',
-      'OTHER': '📦',
-      'other': '📦'
-    };
-    return icons[category] || icons[category.toUpperCase()] || '📦';
-  }
-
-  function formatCategoryName(category: string): string {
-    const names: Record<string, string> = {
-      'FOOD': 'Makanan',
-      'food': 'Makanan',
-      'TRANSPORT': 'Transport',
-      'transport': 'Transport',
-      'SHOPPING': 'Belanja',
-      'shopping': 'Belanja',
-      'ENTERTAINMENT': 'Hiburan',
-      'entertainment': 'Hiburan',
-      'HEALTH': 'Kesehatan',
-      'health': 'Kesehatan',
-      'EDUCATION': 'Pendidikan',
-      'education': 'Pendidikan',
-      'UTILITIES': 'Tagihan',
-      'utilities': 'Tagihan',
-      'SAVINGS': 'Tabungan',
-      'savings': 'Tabungan',
-      'OTHER': 'Lainnya',
-      'other': 'Lainnya'
-    };
-    return names[category] || names[category.toLowerCase()] || category;
-  }
+  let justOpened = false;
+  let ignoreScrollUntil = 0; // Timestamp to ignore scroll events
 
   onMount(() => {
-    // Stop event propagation from the entire component
-    if (dropdownElement) {
-      dropdownElement.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-    }
+    // Close dropdown when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+
+      // If dropdown was just opened in this same click, ignore
+      if (justOpened) {
+        justOpened = false;
+        return;
+      }
+
+      // Don't process if dropdown is already closed
+      if (!isOpen) {
+        return;
+      }
+
+      // Don't close if clicking on the category display button or its children
+      if (categoryDisplayElement && (categoryDisplayElement === target || categoryDisplayElement.contains(target))) {
+        return;
+      }
+
+      // Don't close if clicking inside the dropdown
+      if (dropdownElement && (dropdownElement === target || dropdownElement.contains(target))) {
+        return;
+      }
+
+      // Close dropdown by dispatching toggle event
+      dispatch('toggle');
+    };
+
+    // Close dropdown when scrolling (but ignore scroll events right after opening)
+    const handleScroll = (event: Event) => {
+      const now = Date.now();
+      if (now < ignoreScrollUntil) {
+        return;
+      }
+
+      // Don't close if scrolling inside the dropdown itself
+      const target = event.target as HTMLElement;
+      if (dropdownElement && (dropdownElement === target || dropdownElement.contains(target))) {
+        return;
+      }
+
+      if (isOpen) {
+        dispatch('toggle');
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    window.addEventListener('scroll', handleScroll, true); // Use capture phase to catch all scroll events
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
   });
 </script>
 
-<div class="inline-category-selector" bind:this={dropdownElement}>
+<div class="inline-category-selector">
   <!-- Category Name Display (clickable to toggle dropdown) -->
   <button
+    bind:this={categoryDisplayElement}
     class="category-display"
     class:dropdown-open={isOpen}
     on:click={handleCategoryDisplayClick}
@@ -93,10 +123,17 @@
     <span class="category-text">{formatCategoryName(currentCategory)}</span>
     <span class="dropdown-indicator" class:rotate={isOpen}>▼</span>
   </button>
+</div>
 
-  <!-- Dropdown List (always visible when component mounted) -->
-  {#if isOpen}
-    <div class="category-dropdown" transition:slide={{ duration: 200, easing: quintOut }}>
+<!-- Dropdown rendered in Portal (outside normal DOM hierarchy) -->
+{#if isOpen}
+  <Portal>
+    <div
+      class="category-dropdown"
+      style={dropdownStyle}
+      bind:this={dropdownElement}
+      transition:slide={{ duration: 200, easing: quintOut }}
+    >
       {#each categories as category}
         <button
           class="category-option"
@@ -112,14 +149,13 @@
         </button>
       {/each}
     </div>
-  {/if}
-</div>
+  </Portal>
+{/if}
 
 <style>
   .inline-category-selector {
-    position: relative;
+    position: relative; /* Changed to relative so absolute dropdown positions relative to this */
     width: 100%;
-    z-index: 100;
   }
 
   .category-display {
@@ -165,20 +201,21 @@
   }
 
   .category-dropdown {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
+    /* Position set via inline style (fixed positioning from Portal) */
     background: white;
     border: 1px solid rgba(6, 182, 212, 0.2);
     border-radius: 8px;
     box-shadow:
       0 8px 24px rgba(0, 0, 0, 0.15),
       0 4px 12px rgba(0, 191, 255, 0.2);
-    z-index: 10000;
+    z-index: 999999; /* Highest z-index - rendered in Portal outside stacking contexts */
     max-height: 280px;
     overflow-y: auto;
     backdrop-filter: blur(10px);
+
+    /* Prevent scroll jumps */
+    contain: layout style paint;
+    will-change: transform;
   }
 
   .category-option {

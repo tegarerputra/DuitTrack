@@ -26,10 +26,22 @@ Comprehensive documentation is available in the `documentation/` directory:
 - Tailwind CSS
 
 ## Getting Started
+
+### Quick Start (Windows)
+Double-click `start-dev.bat` to launch the development server automatically.
+
+### Manual Start
 1. Clone the repository
 2. Install dependencies: `npm install`
 3. Set up Firebase configuration
-4. Run development server: `npm run dev`
+4. Run development server: `npm run dev -- --port 3000 --host`
+5. Open browser at: `http://localhost:3000`
+
+### Important Notes
+- **This is a SvelteKit application** - Do NOT use `http-server` or other static file servers
+- Always use `npm run dev` for development
+- Default port: 3000
+- The app includes routing for `/budget`, `/dashboard`, `/tracking`, etc.
 
 ## Contributing
 1. Fork the repository

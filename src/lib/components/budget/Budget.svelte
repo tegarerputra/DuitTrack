@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
   import { writable, derived } from 'svelte/store';
-  import { budgetStore, budgetActions, budgetCategoriesStore } from '../../stores/budget';
   import { authService } from '../../services/authService';
   import { DataService } from '../../services/dataService';
   import { toastStore } from '../../stores/toast';
@@ -16,7 +15,7 @@
 
   // Internal state management
   let currentPeriodId = '';
-  let userResetDate = 1;
+  let userResetDate = 25; // ✅ FIXED: Match default with Dashboard/Expenses (was hardcoded to 1)
 
   // Subscribe to shared period store for cross-page persistence
   selectedPeriodStore.subscribe((value) => {
@@ -33,10 +32,7 @@
   let categories: any[] = [];
   let isLoading = false;
   let dataService: DataService | null = null;
-  let showQuickSetup = false;
   let showAddCategoryForm = false;
-  let showEditTotalModal = false;
-  let selectedPackage = '';
   let newCategoryData = {
     id: '',
     name: '',
@@ -375,9 +371,8 @@
       // Initialize data service
       dataService = new DataService(user.uid);
 
-      // Load user settings and setup period selector
+      // Load user settings
       await loadUserSettings();
-      await setupPeriodSelector();
 
       // Load budget data for current period
       await loadBudgetData();
@@ -395,6 +390,18 @@
         if (profile) {
           userProfile = profile;
           userResetDate = profile.budgetResetDate || 25;
+
+          // 🔥 FIX: If userProfile has different resetDate, clear stored period to force regeneration
+          const storedPeriod = $selectedPeriodStore;
+          if (storedPeriod && profile.budgetResetDate) {
+            // Extract day from stored period (format: YYYY-MM-DD)
+            const storedDay = parseInt(storedPeriod.split('-')[2]);
+            if (storedDay !== profile.budgetResetDate) {
+              console.log(`⚠️ Reset date changed from ${storedDay} to ${profile.budgetResetDate}, clearing period`);
+              selectedPeriodStore.clear();
+              currentPeriodId = '';
+            }
+          }
         }
       });
 
@@ -422,26 +429,6 @@
     // loadBudgetData();
   }
 
-  async function setupPeriodSelector() {
-    try {
-      // Generate available periods based on user's reset date
-      const periods = generatePeriodOptions(userResetDate, 12);
-      availablePeriods.set(periods);
-
-      // DON'T set period here - let PeriodSelector handle it
-      // Just read from store if available
-      const storedPeriod = $selectedPeriodStore;
-      if (storedPeriod) {
-        currentPeriodId = storedPeriod;
-        selectedPeriod.set(currentPeriodId);
-        console.log('✅ Budget: Period selector using stored period:', currentPeriodId);
-      } else {
-        console.log('📅 Budget: Period selector waiting for PeriodSelector');
-      }
-    } catch (error) {
-      console.error('❌ Error setting up period selector:', error);
-    }
-  }
 
   async function loadBudgetData() {
     if (!dataService || !currentPeriodId) return;
@@ -501,12 +488,6 @@
     }
   }
 
-  function handlePeriodChange(event: Event) {
-    const target = event.target as HTMLSelectElement;
-    currentPeriodId = target.value;
-    selectedPeriod.set(currentPeriodId);
-    loadBudgetData();
-  }
 
   async function handleCategoryBudgetUpdate(categoryId: string, newBudget: number) {
     try {
@@ -635,45 +616,6 @@
     return colors[Math.floor(Math.random() * colors.length)];
   }
 
-  // Budget package management
-  const budgetPackages = {
-    conservative: {
-      name: 'Conservative',
-      description: 'Safe spending with high savings focus',
-      categories: [
-        { id: 'food', name: 'Makanan', emoji: '🍽️', budget: 1500000 },
-        { id: 'transport', name: 'Transport', emoji: '🚗', budget: 800000 },
-        { id: 'utilities', name: 'Tagihan', emoji: '💡', budget: 600000 },
-        { id: 'savings', name: 'Tabungan', emoji: '💰', budget: 2000000 },
-        { id: 'other', name: 'Lainnya', emoji: '📦', budget: 300000 }
-      ]
-    },
-    balanced: {
-      name: 'Balanced',
-      description: 'Moderate spending with balanced lifestyle',
-      categories: [
-        { id: 'food', name: 'Makanan', emoji: '🍽️', budget: 2000000 },
-        { id: 'transport', name: 'Transport', emoji: '🚗', budget: 1000000 },
-        { id: 'shopping', name: 'Belanja', emoji: '🛍️', budget: 800000 },
-        { id: 'entertainment', name: 'Hiburan', emoji: '🎬', budget: 500000 },
-        { id: 'utilities', name: 'Tagihan', emoji: '💡', budget: 700000 },
-        { id: 'savings', name: 'Tabungan', emoji: '💰', budget: 1500000 }
-      ]
-    },
-    flexible: {
-      name: 'Flexible',
-      description: 'Higher spending with lifestyle focus',
-      categories: [
-        { id: 'food', name: 'Makanan', emoji: '🍽️', budget: 2500000 },
-        { id: 'transport', name: 'Transport', emoji: '🚗', budget: 1200000 },
-        { id: 'shopping', name: 'Belanja', emoji: '🛍️', budget: 1200000 },
-        { id: 'entertainment', name: 'Hiburan', emoji: '🎬', budget: 800000 },
-        { id: 'health', name: 'Kesehatan', emoji: '⚕️', budget: 600000 },
-        { id: 'education', name: 'Pendidikan', emoji: '📚', budget: 400000 },
-        { id: 'savings', name: 'Tabungan', emoji: '💰', budget: 1000000 }
-      ]
-    }
-  };
 
   function validateCategoryForm(): boolean {
     let isValid = true;
@@ -777,34 +719,6 @@
     }
   }
 
-  function handlePackageSelect(packageKey: string) {
-    selectedPackage = packageKey;
-  }
-
-  async function handleApplyPackage() {
-    if (!selectedPackage || !budgetPackages[selectedPackage]) return;
-
-    const packageData = budgetPackages[selectedPackage];
-
-    // Clear existing categories and apply package
-    categories = packageData.categories.map(cat => ({ ...cat, spent: 0 }));
-
-    // Update budget data
-    budgetData.set({
-      categories: Object.fromEntries(
-        categories.map(cat => [cat.id, { budget: cat.budget, spent: 0 }])
-      ),
-      totalBudget: categories.reduce((sum, cat) => sum + cat.budget, 0),
-      totalSpent: 0
-    });
-
-    showQuickSetup = false;
-    selectedPackage = '';
-  }
-
-  function handleSkipQuickSetup() {
-    showQuickSetup = false;
-  }
 
   function generatePeriodOptions(resetDate: number, count: number) {
     const periods = [];
@@ -862,6 +776,7 @@
     };
     return emojis[categoryId.toLowerCase()] || '📦';
   }
+
 
   function formatCurrencyInput(amount: number): string {
     if (!amount || amount === 0) return '';
@@ -961,6 +876,7 @@
     });
 
     console.log(`📊 Budget dummy data loaded for period: ${currentPeriodId}`);
+    console.log(`🔍 [BUDGET] PeriodID: ${currentPeriodId}, ResetDate: ${userResetDate}, Total: Rp ${totalSpent.toLocaleString('id-ID')}`);
     console.log('💰 Budget total spent:', totalSpent);
     console.log('📈 Category spending:', categorySpending);
   }

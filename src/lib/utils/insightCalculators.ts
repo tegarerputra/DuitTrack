@@ -277,12 +277,4 @@ export function calculateBudgetStatus(
   }
 }
 
-/**
- * Helper: Format rupiah for display
- */
-export function formatRupiah(amount: number): string {
-  if (amount === null || amount === undefined || isNaN(amount)) return '0';
-  const numAmount = Math.abs(Math.floor(amount));
-  const formatted = numAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return formatted;
-}
+// ✅ REMOVED: formatRupiah duplicate - use formatRupiah from $utils/index instead

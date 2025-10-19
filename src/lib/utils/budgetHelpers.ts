@@ -95,40 +95,8 @@ export function getBudgetSetupStatus(
   };
 }
 
-/**
- * Calculate budget status (safe, warning, danger, over)
- *
- * @param spent - Amount spent
- * @param budget - Budget amount
- * @returns Status string
- */
-export function getBudgetStatus(spent: number, budget: number): 'safe' | 'warning' | 'danger' | 'over' {
-  if (budget === 0) return 'safe';
-
-  const percentage = (spent / budget) * 100;
-
-  if (percentage >= 100) return 'over';
-  if (percentage >= 80) return 'danger';
-  if (percentage >= 60) return 'warning';
-  return 'safe';
-}
-
-/**
- * Get budget status color classes
- *
- * @param status - Budget status
- * @returns Tailwind CSS classes
- */
-export function getBudgetStatusColor(status: 'safe' | 'warning' | 'danger' | 'over'): string {
-  const colors = {
-    safe: 'text-green-600 bg-green-100',
-    warning: 'text-yellow-600 bg-yellow-100',
-    danger: 'text-orange-600 bg-orange-100',
-    over: 'text-red-600 bg-red-100'
-  };
-
-  return colors[status];
-}
+// ✅ REMOVED: getBudgetStatus - use from $utils/index instead
+// ✅ REMOVED: getBudgetStatusColor - use from $utils/index instead
 
 /**
  * Get budget status message in Indonesian
@@ -216,14 +184,12 @@ export function getBudgetWarningMessage(
   return '';
 }
 
-/**
- * Format Rupiah (duplicate from utils but needed here)
- */
+// ✅ REMOVED: formatRupiah duplicate - import from $utils/index instead
+import { formatRupiah as formatRupiahUtil } from '$utils/index';
+
 function formatRupiah(amount: number): string {
-  if (amount === null || amount === undefined || isNaN(amount)) return '0';
-  const numAmount = Math.abs(Math.floor(amount));
-  const formatted = numAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return formatted;
+  // Use the utility function and strip the 'Rp ' prefix for backward compatibility
+  return formatRupiahUtil(amount).replace('Rp ', '');
 }
 
 /**

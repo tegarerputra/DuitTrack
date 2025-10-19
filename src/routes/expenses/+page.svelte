@@ -8,6 +8,8 @@
     expensesStore,
     filteredExpenses,
     dailyExpenses,
+    groupedExpensesByDate,
+    filteredExpensesTotal,
     expenseActions,
     categoryFilterStore,
     expenseSearchStore,
@@ -18,6 +20,8 @@
   import PeriodSelector from '$lib/components/dashboard/PeriodSelector.svelte';
   import { userProfileStore } from '$stores/auth';
   import { selectedPeriodStore } from '$lib/stores/period';
+  import { formatIDR, formatDate as formatDateUtil } from '$lib/utils/index';
+  import { getCategoryIcon, formatCategoryName } from '$lib/utils/categoryHelpers';
 
   // Navigation context
   let returnPath = '';
@@ -33,11 +37,9 @@
   // Chart data
   let chartData: any[] = [];
 
-  // Track which expense has open category selector
+  // Track which expense has open category selector and dropdown state
   let activeExpenseId: string | null = null;
-
-  // Undo functionality
-  let undoStack: Array<{ expenseId: string; oldCategory: string; newCategory: string }> = [];
+  let categoryDropdownOpen: Record<string, boolean> = {}; // Track dropdown state per expense ID
 
   // Subscribe to shared period store for cross-page persistence
   selectedPeriodStore.subscribe((value) => {
@@ -62,7 +64,18 @@
     userProfileStore.subscribe(profile => {
       if (profile) {
         userProfile = profile;
-        // DON'T set period here - let PeriodSelector handle it
+
+        // 🔥 FIX: If userProfile has different resetDate, clear stored period to force regeneration
+        const storedPeriod = $selectedPeriodStore;
+        if (storedPeriod && profile.budgetResetDate) {
+          // Extract day from stored period (format: YYYY-MM-DD)
+          const storedDay = parseInt(storedPeriod.split('-')[2]);
+          if (storedDay !== profile.budgetResetDate) {
+            console.log(`⚠️ Reset date changed from ${storedDay} to ${profile.budgetResetDate}, clearing period`);
+            selectedPeriodStore.clear();
+            currentPeriodId = '';
+          }
+        }
       }
     });
 
@@ -95,32 +108,8 @@
     };
   });
 
-  function updateCurrentPeriodFlexible(profile: any) {
-    const today = new Date();
-    const resetDate = profile.budgetResetDate || 25;
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-    const day = today.getDate();
-
-    // If today is before reset date, use previous month's period
-    if (day < resetDate) {
-      const prevMonth = month === 1 ? 12 : month - 1;
-      const prevYear = month === 1 ? year - 1 : year;
-      currentPeriodId = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(resetDate).padStart(2, '0')}`;
-    } else {
-      currentPeriodId = `${year}-${String(month).padStart(2, '0')}-${String(resetDate).padStart(2, '0')}`;
-    }
-    selectedPeriodStore.set(currentPeriodId); // Save to shared store
-  }
-
-  function updateCurrentPeriod() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-    const day = 25; // Default reset date
-    currentPeriodId = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    selectedPeriodStore.set(currentPeriodId); // Save to shared store
-  }
+  // Period management is now handled by PeriodSelector component
+  // No manual period update functions needed - period changes through handlePeriodChange()
 
   // Watch for currentPeriodId changes to reload data
   $: if (currentPeriodId) {
@@ -131,6 +120,8 @@
   $: expenses = $filteredExpenses;
   $: isLoading = $expensesLoadingStore;
   $: chartData = $dailyExpenses;
+  $: groupedExpenses = $groupedExpensesByDate;
+  $: totalExpenses = $filteredExpensesTotal;
 
   async function loadExpensesData() {
     expenseActions.setLoading(true);
@@ -146,6 +137,7 @@
       expenseActions.setLoading(false);
 
       console.log(`📊 Dummy expenses loaded for Expenses page - Period: ${currentPeriodId}`);
+      console.log(`🔍 [EXPENSES] PeriodID: ${currentPeriodId}, ResetDate: ${userProfile?.budgetResetDate || 25}, Total: Rp ${periodExpenses.reduce((s: number, e: any) => s + e.amount, 0).toLocaleString('id-ID')}`);
     }, 800);
   }
 
@@ -199,52 +191,50 @@
     goto(`/add-expense?return=expenses`);
   }
 
-  function handleExpenseClick(expense: any) {
+  function handleExpenseClick(expense: any, event: MouseEvent) {
+    // Stop event from bubbling to document click handler
+    event.stopPropagation();
+
+    // Check if click is from category selector - if so, ignore it
+    const target = event.target as HTMLElement;
+    if (target.closest('.inline-category-selector') || target.closest('.category-display')) {
+      return; // Don't toggle if clicking on category selector
+    }
+
     // Toggle category selector
     if (activeExpenseId === expense.id) {
       activeExpenseId = null;
+      // Close dropdown when unfocusing
+      categoryDropdownOpen[expense.id] = false;
     } else {
       activeExpenseId = expense.id;
+      // Initialize dropdown state as closed when focusing
+      categoryDropdownOpen[expense.id] = false;
     }
   }
 
   function handleCategoryChange(expense: any, event: CustomEvent) {
     const { newCategory } = event.detail;
-    const oldCategory = expense.category;
-
-    // Save to undo stack
-    undoStack.push({
-      expenseId: expense.id,
-      oldCategory,
-      newCategory
-    });
 
     // Update the category
     expenseActions.changeExpenseCategory(expense.id, newCategory);
 
-    // Close the selector
+    // Close the selector and dropdown
     activeExpenseId = null;
+    categoryDropdownOpen[expense.id] = false;
 
-    // Show success toast with undo
-    const toastId = toast.success(
-      (t) => {
-        return `
-          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-            <span>✓ Kategori diubah ke ${formatCategoryName(newCategory)}</span>
-            <button
-              onclick="window.undoLastCategoryChange()"
-              style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 4px 12px; color: white; cursor: pointer; font-weight: 600;"
-            >
-              Undo
-            </button>
-          </div>
-        `;
-      },
-      {
-        duration: 5000,
-        style: 'background: linear-gradient(135deg, rgba(0, 191, 255, 0.9), rgba(30, 144, 255, 0.95)); color: white; padding: 12px 16px; border-radius: 12px;'
-      }
-    );
+    // Show simple success toast
+    toast.success(`Kategori diubah ke ${formatCategoryName(newCategory)}`, {
+      duration: 3000,
+      style: 'background: linear-gradient(135deg, rgba(0, 191, 255, 0.9), rgba(30, 144, 255, 0.95)); color: white; padding: 12px 16px; border-radius: 12px;'
+    });
+  }
+
+  // Handle dropdown toggle from child component
+  function handleDropdownToggle(expense: any) {
+    categoryDropdownOpen[expense.id] = !categoryDropdownOpen[expense.id];
+    // Trigger reactivity
+    categoryDropdownOpen = { ...categoryDropdownOpen };
   }
 
   function handleDeleteExpense(expense: any, event: Event) {
@@ -254,7 +244,7 @@
     const expenseInfo = {
       id: expense.id,
       category: formatCategoryName(expense.category),
-      amount: formatCurrency(expense.amount)
+      amount: formatIDR(expense.amount)
     };
 
     // Show simple confirmation message
@@ -275,98 +265,17 @@
     }
   }
 
-  // Setup global functions for toast interactions
-  $: if (typeof window !== 'undefined') {
-    (window as any).undoLastCategoryChange = () => {
-      const lastChange = undoStack.pop();
-      if (lastChange) {
-        expenseActions.changeExpenseCategory(lastChange.expenseId, lastChange.oldCategory);
-        toast.success('✓ Perubahan dibatalkan', {
-          duration: 2000,
-          style: 'background: rgba(107, 114, 128, 0.95); color: white;'
-        });
-      }
-    };
-  }
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  }
-
+  // Format date with short weekday, day, and month
   function formatDate(date: Date | any): string {
     const d = date instanceof Date ? date : date.toDate();
-    return d.toLocaleDateString('id-ID', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short'
-    });
+    return formatDateUtil(d, { weekday: 'short', day: 'numeric', month: 'short' });
   }
 
-  function formatCategoryName(category: string): string {
-    const names: Record<string, string> = {
-      'FOOD': 'Makanan',
-      'food': 'Makanan',
-      'TRANSPORT': 'Transport',
-      'transport': 'Transport',
-      'SHOPPING': 'Belanja',
-      'shopping': 'Belanja',
-      'ENTERTAINMENT': 'Hiburan',
-      'entertainment': 'Hiburan',
-      'HEALTH': 'Kesehatan',
-      'health': 'Kesehatan',
-      'EDUCATION': 'Pendidikan',
-      'education': 'Pendidikan',
-      'UTILITIES': 'Tagihan',
-      'utilities': 'Tagihan',
-      'OTHER': 'Lainnya',
-      'other': 'Lainnya'
-    };
-    return names[category] || category;
-  }
-
-  function getCategoryIcon(category: string): string {
-    const icons: Record<string, string> = {
-      'FOOD': '🍽️',
-      'TRANSPORT': '🚗',
-      'SHOPPING': '🛍️',
-      'ENTERTAINMENT': '🎬',
-      'HEALTH': '💊',
-      'EDUCATION': '📚',
-      'UTILITIES': '⚡',
-      'OTHER': '📦'
-    };
-    return icons[category] || '📦';
-  }
-
-  function groupExpensesByDate(expenses: any[]) {
-    const grouped: Record<string, any[]> = {};
-
-    expenses.forEach(expense => {
-      const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
-      const dateKey = date.toISOString().split('T')[0];
-
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
-      }
-      grouped[dateKey].push(expense);
-    });
-
-    return Object.entries(grouped)
-      .map(([date, expenses]) => ({ date: new Date(date), expenses }))
-      .sort((a, b) => b.date.getTime() - a.date.getTime());
-  }
-
+  // Get total for a day's expenses
   function getDayTotal(expenses: any[]): number {
     return expenses.reduce((total, expense) => total + expense.amount, 0);
   }
-
-  $: groupedExpenses = groupExpensesByDate(expenses);
-  $: totalExpenses = expenses.reduce((total, expense) => total + expense.amount, 0);
 </script>
 
 <div class="expenses-page">
@@ -417,7 +326,7 @@
             <div class="amount-section-hero">
               <span class="amount-label">TOTAL SPENDING</span>
               <div class="amount-display-new">
-                <span class="main-amount-large">{formatCurrency(totalExpenses)}</span>
+                <span class="main-amount-large">{formatIDR(totalExpenses)}</span>
               </div>
             </div>
           </div>
@@ -431,7 +340,7 @@
                   <div class="chart-bar-enhanced" style="height: {(day.amount / Math.max(...chartData.map(d => d.amount))) * 100}%">
                     <div class="chart-tooltip-enhanced">
                       <div class="tooltip-date">{new Date(day.date).getDate()}</div>
-                      <div class="tooltip-amount">{formatCurrency(day.amount)}</div>
+                      <div class="tooltip-amount">{formatIDR(day.amount)}</div>
                     </div>
                   </div>
                 {/each}
@@ -440,20 +349,28 @@
           {/if}
 
           <!-- Integrated Spending Insights -->
-          <div class="hero-insights">
-            <div class="hero-insight-item">
-              <span class="hero-insight-icon">🏆</span>
-              <span class="hero-insight-text">Top: Food ({Math.round((expenses.filter(e => e.category === 'FOOD').reduce((sum, e) => sum + e.amount, 0) / totalExpenses) * 100)}%)</span>
+          {#if expenses.length > 0 && totalExpenses > 0}
+            <div class="hero-insights">
+              <div class="hero-insight-item">
+                <span class="hero-insight-icon">🏆</span>
+                <span class="hero-insight-text">
+                  Top: {(() => {
+                    const foodTotal = expenses.filter(e => e.category === 'FOOD').reduce((sum, e) => sum + e.amount, 0);
+                    const percentage = Math.round((foodTotal / totalExpenses) * 100);
+                    return `Makanan (${percentage}%)`;
+                  })()}
+                </span>
+              </div>
+              <div class="hero-insight-item">
+                <span class="hero-insight-icon">📈</span>
+                <span class="hero-insight-text">Daily avg: {formatIDR(totalExpenses / 30)}</span>
+              </div>
+              <div class="hero-insight-item">
+                <span class="hero-insight-icon">📅</span>
+                <span class="hero-insight-text">Active: {new Set(expenses.map(e => e.date.toDateString())).size} days</span>
+              </div>
             </div>
-            <div class="hero-insight-item">
-              <span class="hero-insight-icon">📈</span>
-              <span class="hero-insight-text">Daily avg: {formatCurrency(totalExpenses / 30)}</span>
-            </div>
-            <div class="hero-insight-item">
-              <span class="hero-insight-icon">📅</span>
-              <span class="hero-insight-text">Active: {new Set(expenses.map(e => e.date.toDateString())).size} days</span>
-            </div>
-          </div>
+          {/if}
         </div>
       </div>
     </div>
@@ -528,7 +445,7 @@
           <div class="expense-group secondary-glassmorphism">
             <div class="group-header">
               <div class="group-date">{formatDate(date)}</div>
-              <div class="group-total">{formatCurrency(getDayTotal(dayExpenses))}</div>
+              <div class="group-total">{formatIDR(getDayTotal(dayExpenses))}</div>
             </div>
 
             <div class="expense-items">
@@ -536,10 +453,10 @@
                 <div
                   class="expense-item-enhanced"
                   class:active={activeExpenseId === expense.id}
-                  on:click={(e) => handleExpenseClick(expense)}
+                  on:click={(e) => handleExpenseClick(expense, e)}
                   role="button"
                   tabindex="0"
-                  on:keydown={(e) => e.key === 'Enter' && handleExpenseClick(expense)}
+                  on:keydown={(e) => e.key === 'Enter' && handleExpenseClick(expense, e)}
                 >
                   <div class="expense-icon-enhanced">
                     {getCategoryIcon(expense.category)}
@@ -549,6 +466,8 @@
                       <InlineCategorySelector
                         currentCategory={expense.category}
                         {categories}
+                        isOpen={categoryDropdownOpen[expense.id] || false}
+                        on:toggle={() => handleDropdownToggle(expense)}
                         on:categoryChange={(e) => handleCategoryChange(expense, e)}
                       />
                     {:else}
@@ -557,7 +476,7 @@
                     <div class="expense-description">{expense.description}</div>
                   </div>
                   <div class="expense-amount">
-                    {formatCurrency(expense.amount)}
+                    {formatIDR(expense.amount)}
                   </div>
                   {#if activeExpenseId === expense.id}
                     <button
@@ -565,8 +484,12 @@
                       on:click={(e) => handleDeleteExpense(expense, e)}
                       title="Hapus expense"
                       type="button"
+                      aria-label="Delete expense"
                     >
-                      🗑️
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 0 1 1.334-1.334h2.666a1.333 1.333 0 0 1 1.334 1.334V4m2 0v9.333a1.333 1.333 0 0 1-1.334 1.334H4.667a1.333 1.333 0 0 1-1.334-1.334V4h9.334Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M6.667 7.333v4M9.333 7.333v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
                     </button>
                   {/if}
                 </div>
@@ -582,6 +505,17 @@
       +
     </button>
   </div>
+
+  <!-- Footer -->
+  <footer class="expenses-footer">
+    <div class="footer-content">
+      <p class="footer-text">
+        📧 <a href="mailto:tegarerputra@outlook.com" class="footer-email-link">tegarerputra@outlook.com</a>
+        <span class="footer-separator">•</span>
+        © {new Date().getFullYear()} DuitTrack
+      </p>
+    </div>
+  </footer>
 </div>
 
 <style>
@@ -830,14 +764,6 @@
     color: white;
   }
 
-  .period-indicator {
-    font-size: 16px;
-    font-weight: 600;
-    opacity: 0.7;
-    color: rgba(255, 255, 255, 0.8);
-    margin-left: 8px;
-  }
-
   /* Hero Chart */
   .hero-chart-container {
     background: rgba(255, 255, 255, 0.2);
@@ -966,8 +892,8 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.8);
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     margin-bottom: 1rem;
-    position: relative;
-    z-index: 1;
+    /* IMPORTANT: Don't add position or z-index - creates stacking context that traps dropdown */
+    overflow: visible; /* Allow dropdown to escape */
   }
 
   /* Hero summary specific spacing */
@@ -986,47 +912,8 @@
     border-color: rgba(0, 191, 255, 0.2);
     backdrop-filter: blur(30px) saturate(2);
     -webkit-backdrop-filter: blur(30px) saturate(2);
-    transform: translateY(-4px);
-  }
-
-  /* Smart Insights Card */
-  .insights-card {
-    padding: 1.5rem;
-  }
-
-  .insights-title {
-    color: #1f2937;
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0 0 16px 0;
-  }
-
-  .insight-items {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .insight-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-  }
-
-  .insight-icon {
-    font-size: 20px;
-    width: 32px;
-    text-align: center;
-  }
-
-  .insight-text {
-    color: #4a5568;
-    font-size: 14px;
-    font-weight: 500;
+    /* REMOVED transform - creates stacking context that traps dropdown */
+    /* transform: translateY(-4px); */
   }
 
   /* Filters Section */
@@ -1181,7 +1068,10 @@
   /* Expense Groups */
   .expense-group {
     padding: 1.5rem;
-    overflow: visible;
+    /* IMPORTANT: Don't add position:relative or it creates stacking context */
+    /* Dropdown needs to escape this container */
+    /* Use isolation to prevent stacking context issues */
+    isolation: isolate;
   }
 
   .group-header {
@@ -1209,7 +1099,6 @@
     flex-direction: column;
     gap: 0.75rem;
     position: relative;
-    z-index: 1;
   }
 
   /* ===== ENHANCED EXPENSE ITEMS ===== */
@@ -1249,7 +1138,8 @@
     align-items: flex-start;
     padding-bottom: 16px;
     margin-bottom: 16px;
-    z-index: 100;
+    z-index: 1000; /* Higher z-index for active item */
+    position: relative; /* Establish z-index context */
   }
 
   .expense-icon-enhanced {
@@ -1269,6 +1159,7 @@
 
   .expense-details {
     flex: 1;
+    position: relative; /* For dropdown positioning */
   }
 
   .expense-category {
@@ -1297,39 +1188,36 @@
     flex-shrink: 0;
   }
 
-  /* Delete Button */
+  /* Delete Button - Matching Budget Page Style */
   .delete-button {
-    width: 40px;
-    height: 40px;
-    background: linear-gradient(135deg,
-      rgba(239, 68, 68, 0.1) 0%,
-      rgba(220, 38, 38, 0.15) 100%);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 10px;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    background: rgba(244, 67, 54, 0.08);
+    border: 1px solid rgba(244, 67, 54, 0.2);
+    color: #d32f2f;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s ease;
     flex-shrink: 0;
     margin-left: 8px;
   }
 
   .delete-button:hover {
-    background: linear-gradient(135deg,
-      rgba(239, 68, 68, 0.2) 0%,
-      rgba(220, 38, 38, 0.25) 100%);
-    border-color: rgba(239, 68, 68, 0.5);
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    background: rgba(244, 67, 54, 0.15);
+    border-color: rgba(244, 67, 54, 0.35);
+    transform: scale(1.1);
+  }
+
+  .delete-button:focus {
+    outline: 2px solid rgba(244, 67, 54, 0.5);
+    outline-offset: 2px;
   }
 
   .delete-button:active {
     transform: scale(0.95);
-    background: linear-gradient(135deg,
-      rgba(239, 68, 68, 0.3) 0%,
-      rgba(220, 38, 38, 0.35) 100%);
   }
 
   /* Floating Add Button */
@@ -1457,11 +1345,15 @@
     }
 
     .delete-button {
-      width: 36px;
-      height: 36px;
-      font-size: 16px;
-      border-radius: 8px;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 6px;
       margin-left: 6px;
+    }
+
+    .delete-button svg {
+      width: 14px;
+      height: 14px;
     }
 
     /* Optimize expense groups for mobile */
@@ -1658,6 +1550,73 @@
       text-align: right;
       min-width: 200px;
       max-width: 280px;
+    }
+  }
+
+  /* Expenses Footer */
+  .expenses-footer {
+    margin-top: 40px;
+    padding: 24px 20px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(6, 182, 212, 0.1);
+    border-radius: 16px 16px 0 0;
+    position: relative;
+    z-index: 2;
+  }
+
+  .expenses-footer .footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .expenses-footer .footer-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .expenses-footer .footer-email-link {
+    color: #0891B2;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-weight: 600;
+  }
+
+  .expenses-footer .footer-email-link:hover {
+    color: #06B6D4;
+    text-decoration: underline;
+  }
+
+  .expenses-footer .footer-separator {
+    color: #d1d5db;
+    font-weight: 400;
+    padding: 0 4px;
+  }
+
+  /* Mobile responsive footer */
+  @media (max-width: 430px) {
+    .expenses-footer {
+      margin-top: 32px;
+      padding: 20px 16px;
+    }
+
+    .expenses-footer .footer-text {
+      font-size: 13px;
+      gap: 6px;
+    }
+
+    .expenses-footer .footer-email-link {
+      font-size: 13px;
     }
   }
 </style>

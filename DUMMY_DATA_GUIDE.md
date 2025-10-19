@@ -151,17 +151,23 @@ Test kategori yang over budget:
 
 ## 🐛 Common Issues & Fixes
 
-### Issue 1: Category ID Case Mismatch
-**Problem**: Expenses tidak muncul di category filter
-**Fix**: Sudah diperbaiki - semua category IDs sekarang UPPERCASE
+### Issue 1: Category ID Case Mismatch ✅ FIXED (2025-01-19)
+**Problem**: Expenses tidak muncul di category filter, spending tidak sync antar halaman
+**Root Cause**: Dashboard menggunakan `.toLowerCase()` sedangkan Budget menggunakan `.toUpperCase()`
+**Fix**:
+- ✅ Dashboard [line 180](src/routes/dashboard/+page.svelte#L180): Changed to `.toUpperCase()`
+- ✅ Expense Store [line 40](src/lib/stores/expenses.ts#L40): Changed filter to `.toUpperCase()`
+- ✅ Semua category IDs sekarang consistently UPPERCASE across all pages
 
-### Issue 2: Spending tidak sync antar halaman
+### Issue 2: Spending tidak sync antar halaman ✅ FIXED (2025-01-19)
 **Problem**: Dashboard dan Budget menampilkan spending berbeda
-**Fix**: Gunakan `calculateCategorySpending()` helper function
+**Root Cause**: Case mismatch dalam category ID (issue #1)
+**Fix**: Fixed dengan standardisasi `.toUpperCase()` di semua pages
+**Verification**: Dashboard total = Expenses total = Budget total
 
 ### Issue 3: Store cache tidak ter-invalidate
 **Problem**: Data lama masih muncul setelah perubahan
-**Fix**: Clear store dengan reload page atau reset store
+**Fix**: Clear store dengan reload page atau `clearPeriodCache()` function
 
 ## 📝 Helper Functions
 
@@ -206,8 +212,10 @@ Setelah perubahan, verifikasi:
 - `src/routes/dashboard/+page.svelte` - Dashboard page
 - `src/routes/expenses/+page.svelte` - Expenses page
 - `src/lib/components/budget/Budget.svelte` - Budget component
+- **[TESTING_SCENARIOS.md](TESTING_SCENARIOS.md)** - 13 testing scenarios untuk adjust dummy data
+- **[SYNC_FIX_SUMMARY.md](SYNC_FIX_SUMMARY.md)** - Summary of synchronization fixes
 
 ---
 
-**Last Updated**: 2025-01-13
-**Status**: ✅ Synced & Documented
+**Last Updated**: 2025-01-19
+**Status**: ✅ Synced, Fixed & Documented

@@ -688,6 +688,17 @@
       </div>
     {/if}
   </div>
+
+  <!-- Footer -->
+  <footer class="add-expense-footer">
+    <div class="footer-content">
+      <p class="footer-text">
+        📧 <a href="mailto:tegarerputra@outlook.com" class="footer-email-link">tegarerputra@outlook.com</a>
+        <span class="footer-separator">•</span>
+        © {new Date().getFullYear()} DuitTrack
+      </p>
+    </div>
+  </footer>
 </div>
 
 <style>
@@ -1264,6 +1275,73 @@
     .btn-secondary, .btn-primary {
       padding: 0.875rem;
       font-size: 0.9375rem;
+    }
+  }
+
+  /* Add Expense Footer */
+  .add-expense-footer {
+    margin-top: 40px;
+    padding: 24px 20px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(6, 182, 212, 0.1);
+    border-radius: 16px 16px 0 0;
+    position: relative;
+    z-index: 2;
+  }
+
+  .add-expense-footer .footer-content {
+    max-width: 500px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .add-expense-footer .footer-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .add-expense-footer .footer-email-link {
+    color: #0891B2;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-weight: 600;
+  }
+
+  .add-expense-footer .footer-email-link:hover {
+    color: #06B6D4;
+    text-decoration: underline;
+  }
+
+  .add-expense-footer .footer-separator {
+    color: #d1d5db;
+    font-weight: 400;
+    padding: 0 4px;
+  }
+
+  /* Mobile responsive footer */
+  @media (max-width: 430px) {
+    .add-expense-footer {
+      margin-top: 32px;
+      padding: 20px 16px;
+    }
+
+    .add-expense-footer .footer-text {
+      font-size: 13px;
+      gap: 6px;
+    }
+
+    .add-expense-footer .footer-email-link {
+      font-size: 13px;
     }
   }
 </style>

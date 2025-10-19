@@ -93,7 +93,20 @@
       "Bash(git merge:*)",
       "Bash(findstr:*)",
       "Bash(git log:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(start http://127.0.0.1:8080)",
+      "Bash(start http://localhost:3001/budget)",
+      "Bash(start http://localhost:3000/expenses)",
+      "Bash(start http://localhost:3001/expenses)",
+      "Bash(start http://localhost:3001/dashboard)",
+      "Bash(timeout 5 bash -c 'while ! curl -s http://localhost:5173 > /dev/null; do sleep 1; done; echo \"\"Server ready\"\"')",
+      "Bash(start http://localhost:3003/budget)",
+      "Bash(timeout 60 npm run check)",
+      "Bash(start http://localhost:5173/dashboard)",
+      "Bash(start http://localhost:3004/dashboard)",
+      "Bash(timeout 10 bash -c 'while ! curl -s http://localhost:5173 > /dev/null; do sleep 1; done; echo \"\"Server ready\"\"')",
+      "Bash(start http://localhost:3000/dashboard)",
+      "Bash(git reset)"
     ],
     "deny": [],
     "ask": []

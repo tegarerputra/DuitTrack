@@ -87,14 +87,7 @@
     loadDashboardData();
   }
 
-  // Subscribe to stores - DISABLED for dummy data mode
-  // $: budgetStore.subscribe((data) => {
-  //   if (data && data.month === currentPeriodId) {
-  //     budgetData = data;
-  //     calculateBudgetMetrics();
-  //     loading = false;
-  //   }
-  // });
+  // Note: Using dummy data instead of budget store
 
   $: expenseStore.subscribe((data) => {
     if (data && data.expenses && data.currentPeriod === currentPeriodId) {
@@ -127,7 +120,18 @@
           // Check budget setup status (will be re-checked after budget data loads)
           hasBudgetSetup = checkBudgetSetup(profile, budgetData);
 
-          // DON'T set period here - let PeriodSelector handle it
+          // 🔥 FIX: If userProfile has different resetDate, clear stored period to force regeneration
+          const storedPeriod = $selectedPeriodStore;
+          if (storedPeriod && profile.budgetResetDate) {
+            // Extract day from stored period (format: YYYY-MM-DD)
+            const storedDay = parseInt(storedPeriod.split('-')[2]);
+            if (storedDay !== profile.budgetResetDate) {
+              console.log(`⚠️ Reset date changed from ${storedDay} to ${profile.budgetResetDate}, clearing period`);
+              selectedPeriodStore.clear();
+              currentPeriodId = '';
+            }
+          }
+
           console.log('📅 Dashboard: Waiting for PeriodSelector to set period');
         }
       });
@@ -150,41 +154,7 @@
     }
   }
 
-  function updateCurrentPeriodFlexible(profile: UserProfile) {
-    const config: PeriodGeneratorConfig = {
-      resetDate: profile.budgetResetDate || 25,
-      resetType: profile.budgetResetType || 'fixed'
-    };
-
-    const periods = generatePeriods(config, 3);
-    currentPeriod = periods.find(p => p.isActive) || periods[0];
-    currentPeriodId = currentPeriod.id;
-
-    // Save to shared store for cross-page persistence
-    selectedPeriodStore.set(currentPeriodId);
-
-    console.log('📅 Current period:', formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate));
-  }
-
-  function updateCurrentPeriod() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-    currentPeriodId = `${year}-${String(month).padStart(2, '0')}`;
-
-    // Generate period object using default monthly period (1st - end of month)
-    const config: PeriodGeneratorConfig = {
-      resetDate: 1,  // Default to 1st of month
-      resetType: 'fixed'
-    };
-    const periods = generatePeriods(config, 3);
-    currentPeriod = periods.find(p => p.isActive) || periods[0];
-
-    // Save to shared store for cross-page persistence
-    selectedPeriodStore.set(currentPeriodId);
-
-    console.log('📅 Using default monthly period:', formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate));
-  }
+  // ✅ REMOVED: Unused period functions - period logic now handled by PeriodSelector component
 
   async function loadDashboardData() {
     try {
@@ -218,7 +188,7 @@
     // Calculate spending per category from actual expenses
     const categorySpending: Record<string, number> = {};
     expenses.forEach((expense: any) => {
-      const categoryId = expense.category.toLowerCase();
+      const categoryId = expense.category.toUpperCase(); // ✅ Match UPPERCASE category IDs
       categorySpending[categoryId] = (categorySpending[categoryId] || 0) + expense.amount;
     });
 
@@ -251,6 +221,7 @@
     loading = false;
 
     console.log(`📊 Dummy data loaded for Dashboard - Period: ${currentPeriodId}`);
+    console.log(`🔍 [DASHBOARD] PeriodID: ${currentPeriodId}, ResetDate: ${userProfile?.budgetResetDate || 25}`);
     console.log('💰 Real total spent:', realTotalSpent);
     console.log('📊 Category spending:', categorySpending);
     console.log('✅ Budget setup detected:', hasBudgetSetup);
@@ -339,24 +310,7 @@
   }
 
 
-  // Helper functions now imported from utils/formatters.ts and utils/budgetHelpers.ts
-  function getBudgetStatusColor(status: BudgetStatus): string {
-    const colors = {
-      safe: 'bg-green-500',
-      warning: 'bg-yellow-500',
-      danger: 'bg-red-500'
-    };
-    return colors[status];
-  }
-
-  function getBudgetStatusIcon(status: BudgetStatus): string {
-    const icons = {
-      safe: '🟢',
-      warning: '🟡',
-      danger: '🔴'
-    };
-    return icons[status];
-  }
+  // ✅ REMOVED: Unused helper functions - never called in the code
 
   // Scroll behavior for floating button - improved with proper cleanup
   function setupScrollListener(): (() => void) | null {
@@ -605,12 +559,11 @@
         <!-- Footer -->
         <footer class="dashboard-footer">
           <div class="footer-content">
-            <div class="footer-contact">
-              <span class="footer-label">Contact:</span>
-              <a href="mailto:tegarerputra@outlook.com" class="footer-email">
-                tegarerputra@outlook.com
-              </a>
-            </div>
+            <p class="footer-text">
+              📧 <a href="mailto:tegarerputra@outlook.com" class="footer-email-link">tegarerputra@outlook.com</a>
+              <span class="footer-separator">•</span>
+              © {new Date().getFullYear()} DuitTrack
+            </p>
           </div>
         </footer>
 
@@ -776,433 +729,7 @@
     gap: 12px;
   }
 
-  /* Period Selector - Removed old styles, now handled by PeriodSelector component */
-
-  /* HERO CARD - The Star of the Show! */
-  /* Hero budget card - restored working version */
-  .hero-budget-card {
-    position: relative;
-    border-radius: 16px;
-    padding: 36px;
-    overflow: hidden;
-    transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    cursor: pointer;
-    min-height: 320px;
-    backdrop-filter: blur(30px) saturate(2);
-    -webkit-backdrop-filter: blur(30px) saturate(2);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    box-shadow:
-      0 8px 25px rgba(0, 191, 255, 0.08),
-      0 4px 12px rgba(0, 191, 255, 0.12),
-      0 2px 6px rgba(30, 144, 255, 0.15),
-      inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  }
-
-  .hero-budget-card:hover {
-    transform: translateY(-12px) scale(1.02);
-    box-shadow:
-      0 20px 40px rgba(0, 191, 255, 0.12),
-      0 10px 20px rgba(0, 191, 255, 0.15),
-      0 4px 8px rgba(30, 144, 255, 0.18),
-      inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    border-color: rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(40px) saturate(2.2);
-    -webkit-backdrop-filter: blur(40px) saturate(2.2);
-  }
-
-  .hero-glass-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg,
-      rgba(255, 255, 255, 0.2) 0%,
-      transparent 40%,
-      transparent 60%,
-      rgba(6, 182, 212, 0.1) 100%);
-    opacity: 0;
-    transition: opacity 0.4s ease;
-    pointer-events: none;
-  }
-
-  .hero-budget-card:hover .hero-glass-overlay {
-    opacity: 1;
-  }
-
-  /* Hero Gradient Variants - Glassmorphism Style */
-  .hero-gradient-safe {
-    background: linear-gradient(135deg,
-      rgba(0, 191, 255, 0.55) 0%,
-      rgba(30, 144, 255, 0.65) 50%,
-      rgba(0, 123, 255, 0.7) 100%);
-  }
-
-  .hero-gradient-warning {
-    background: linear-gradient(135deg,
-      rgba(251, 191, 36, 0.55) 0%,
-      rgba(245, 158, 11, 0.65) 50%,
-      rgba(217, 119, 6, 0.7) 100%);
-  }
-
-  .hero-gradient-danger {
-    background: linear-gradient(135deg,
-      rgba(244, 114, 182, 0.55) 0%,
-      rgba(239, 68, 68, 0.65) 50%,
-      rgba(220, 38, 38, 0.7) 100%);
-  }
-
-  /* Enhanced Hero Background Elements */
-  .hero-bg-elements {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  .hero-circle {
-    position: absolute;
-    border-radius: 50%;
-    background: linear-gradient(135deg,
-      rgba(255, 255, 255, 0.2) 0%,
-      rgba(255, 255, 255, 0.05) 100%);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-  }
-
-  .hero-circle-1 {
-    width: 140px;
-    height: 140px;
-    top: -70px;
-    right: -70px;
-  }
-
-  .hero-circle-2 {
-    width: 100px;
-    height: 100px;
-    bottom: -50px;
-    left: -50px;
-  }
-
-  .hero-wave {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 80px;
-    background: linear-gradient(135deg,
-      rgba(255, 255, 255, 0.15) 0%,
-      rgba(255, 255, 255, 0.05) 100%);
-    border-radius: 50% 50% 0 0;
-    backdrop-filter: blur(15px);
-  }
-
-  .hero-glass-particle {
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    background: radial-gradient(circle,
-      rgba(255, 255, 255, 0.8) 0%,
-      rgba(6, 182, 212, 0.4) 50%,
-      transparent 100%);
-    border-radius: 50%;
-    animation: particle-float 8s ease-in-out infinite;
-  }
-
-  .hero-particle-1 {
-    top: 25%;
-    left: 20%;
-    animation-delay: 0s;
-  }
-
-  .hero-particle-2 {
-    top: 60%;
-    right: 25%;
-    animation-delay: -3s;
-  }
-
-  .hero-particle-3 {
-    bottom: 30%;
-    left: 60%;
-    animation-delay: -6s;
-  }
-
-  @keyframes particle-float {
-    0%, 100% {
-      transform: translateY(0px) scale(1);
-      opacity: 0.6;
-    }
-    33% {
-      transform: translateY(-15px) scale(1.2);
-      opacity: 1;
-    }
-    66% {
-      transform: translateY(10px) scale(0.8);
-      opacity: 0.4;
-    }
-  }
-
-  /* Hero Content */
-  .hero-content {
-    position: relative;
-    z-index: 2;
-    color: white;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-  }
-
-  .hero-header {
-    margin-bottom: 24px;
-  }
-
-  .hero-title-section {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .hero-title {
-    font-size: 24px;
-    font-weight: 800;
-    margin: 0;
-    letter-spacing: -0.02em;
-  }
-
-  .hero-subtitle {
-    font-size: 14px;
-    font-weight: 600;
-    margin: 0;
-    opacity: 0.9;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .hero-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 20px;
-    backdrop-filter: blur(10px);
-  }
-
-  .hero-emoji {
-    font-size: 16px;
-  }
-
-  .hero-message {
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  /* Hero Amount Display */
-  .hero-amount {
-    margin-bottom: 24px;
-  }
-
-  .amount-section-hero {
-    margin-bottom: 16px;
-  }
-
-  .spent-amount-hero {
-    margin-bottom: 12px;
-  }
-
-  .amount-label {
-    display: block;
-    font-size: 13px;
-    font-weight: 500;
-    opacity: 0.8;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .amount-display {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-  }
-
-  .currency-symbol {
-    font-size: 20px;
-    font-weight: 600;
-    opacity: 0.9;
-  }
-
-  .main-amount {
-    font-size: 36px;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.02em;
-  }
-
-  /* New improved amount display */
-  .amount-display-new {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    margin-top: 8px;
-  }
-
-  .main-amount-large {
-    font-size: 32px;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.02em;
-    color: white;
-  }
-
-  .amount-separator {
-    font-size: 20px;
-    font-weight: 300;
-    opacity: 0.5;
-    margin: 0 4px;
-  }
-
-  .budget-amount-small {
-    font-size: 16px;
-    font-weight: 600;
-    opacity: 0.7;
-    color: rgba(255, 255, 255, 0.8);
-  }
-
-  .budget-total-hero {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    backdrop-filter: blur(5px);
-  }
-
-  .budget-label {
-    font-size: 12px;
-    font-weight: 500;
-    opacity: 0.8;
-  }
-
-  .budget-amount {
-    font-size: 14px;
-    font-weight: 700;
-  }
-
-  .remaining-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
-  }
-
-  .remaining-icon {
-    font-size: 16px;
-  }
-
-  .remaining-text {
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1.3;
-  }
-
-  .remaining-text strong {
-    font-weight: 700;
-  }
-
-  /* Hero Progress */
-  .hero-progress {
-    margin-top: auto;
-  }
-
-  .progress-container-hero {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    padding: 16px;
-    backdrop-filter: blur(10px);
-  }
-
-  .progress-track {
-    height: 8px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-bottom: 12px;
-  }
-
-  .progress-fill-hero {
-    height: 100%;
-    border-radius: 3px;
-    transition: width 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  }
-
-  .progress-safe {
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
-  }
-
-  .progress-warning {
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
-  }
-
-  .progress-danger {
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
-  }
-
-  .progress-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 12px;
-  }
-
-  .progress-percentage {
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1;
-    color: white;
-  }
-
-  .progress-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    color: white;
-    opacity: 0.9;
-  }
-
-  /* Hero Summary - New bottom section */
-  .hero-summary {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .remaining-amount {
-    font-size: 16px;
-    font-weight: 700;
-    color: white;
-  }
-
-  .reset-info {
-    font-size: 14px;
-    font-weight: 500;
-    opacity: 0.7;
-    color: rgba(255, 255, 255, 0.8);
-  }
+  /* ✅ REMOVED: All hero card CSS (~425 lines) - now in FinancialHeroCard_Final.svelte */
 
   /* Sticky Bottom Add Expense Button */
   .sticky-bottom-button {
@@ -1313,143 +840,7 @@
     opacity: 1;
   }
 
-  /* Enhanced Glass Stats Grid */
-  .enhanced-stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 24px;
-  }
-
-  /* Glass stat cards - light blue glassmorphism */
-  .glass-stat-card {
-    position: relative;
-    border-radius: 12px;
-    padding: 28px;
-    min-height: 160px;
-    overflow: hidden;
-    backdrop-filter: blur(25px) saturate(1.8);
-    -webkit-backdrop-filter: blur(25px) saturate(1.8);
-    background: linear-gradient(135deg,
-      rgba(255, 255, 255, 0.5) 0%,
-      rgba(240, 248, 255, 0.4) 50%,
-      rgba(248, 252, 255, 0.6) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    box-shadow:
-      0 8px 32px rgba(0, 191, 255, 0.03),
-      inset 0 1px 0 rgba(255, 255, 255, 0.8);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .glass-stat-card:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow:
-      0 25px 60px rgba(0, 191, 255, 0.06),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    border-color: rgba(0, 191, 255, 0.2);
-    backdrop-filter: blur(30px) saturate(2);
-    -webkit-backdrop-filter: blur(30px) saturate(2);
-    background: linear-gradient(135deg,
-      rgba(240, 248, 255, 0.7) 0%,
-      rgba(248, 252, 255, 0.5) 50%,
-      rgba(245, 250, 255, 0.8) 100%);
-  }
-
-  .glass-card-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(45deg,
-      transparent 0%,
-      rgba(6, 182, 212, 0.05) 50%,
-      transparent 100%);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-  }
-
-  .glass-stat-card:hover .glass-card-overlay {
-    opacity: 1;
-  }
-
-  .glass-card-content {
-    position: relative;
-    z-index: 2;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-  }
-
-  .stat-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-
-  .stat-icon-container {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg,
-      rgba(6, 182, 212, 0.15) 0%,
-      rgba(6, 182, 212, 0.05) 100%);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(6, 182, 212, 0.2);
-    transition: all 0.3s ease;
-  }
-
-  .glass-stat-card:hover .stat-icon-container {
-    background: linear-gradient(135deg,
-      rgba(6, 182, 212, 0.25) 0%,
-      rgba(6, 182, 212, 0.15) 100%);
-    border-color: rgba(6, 182, 212, 0.4);
-    transform: scale(1.1);
-  }
-
-  .stat-icon {
-    font-size: 24px;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-  }
-
-  .stat-label {
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: rgba(75, 85, 99, 0.8);
-    backdrop-filter: blur(5px);
-  }
-
-  .stat-amount {
-    font-size: 28px;
-    font-weight: 800;
-    margin-bottom: 12px;
-    line-height: 1.1;
-    background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 2px 4px rgba(6, 182, 212, 0.1));
-    font-family: 'Inter', monospace;
-  }
-
-  .stat-message {
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(107, 114, 128, 0.9);
-    background: rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(5px);
-    padding: 6px 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-  }
+  /* ✅ REMOVED: Enhanced stats grid CSS (~136 lines) - not used in dashboard */
 
   /* Transactions Card */
   .transactions-card {
@@ -1763,34 +1154,36 @@
     text-align: center;
   }
 
-  .footer-contact {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .footer-label {
+  /* Simple Inline Footer Text */
+  .footer-text {
     font-size: 14px;
     font-weight: 500;
     color: #6b7280;
+    margin: 0;
+    line-height: 1.6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
-  .footer-email {
-    font-size: 14px;
-    font-weight: 600;
+  .footer-email-link {
     color: #0891B2;
     text-decoration: none;
     transition: all 0.2s ease;
-    padding: 4px 8px;
-    border-radius: 6px;
+    font-weight: 600;
   }
 
-  .footer-email:hover {
+  .footer-email-link:hover {
     color: #06B6D4;
-    background: rgba(6, 182, 212, 0.1);
     text-decoration: underline;
+  }
+
+  .footer-separator {
+    color: #d1d5db;
+    font-weight: 400;
+    padding: 0 4px;
   }
 
   /* Dashboard Category Card Glassmorphism Override */
@@ -1885,9 +1278,13 @@
       padding: 20px 16px;
     }
 
-    .footer-contact {
-      flex-direction: column;
-      gap: 4px;
+    .footer-text {
+      font-size: 13px;
+      gap: 6px;
+    }
+
+    .footer-email-link {
+      font-size: 13px;
     }
 
     /* Mobile title styling */

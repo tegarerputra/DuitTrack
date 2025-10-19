@@ -194,19 +194,20 @@
 
 <ToastContainer />
 
-<div class="settings-page">
-	<!-- Header -->
-	<div class="page-header">
-		<h1>👤 Account Settings</h1>
-	</div>
-
-	{#if isLoading}
-		<div class="loading-state">
-			<div class="spinner"></div>
-			<p>Loading account data...</p>
+<div class="settings-container">
+	<div class="settings-page">
+		<!-- Header -->
+		<div class="page-header">
+			<h1>👤 Account Settings</h1>
 		</div>
-	{:else}
-		<div class="settings-section">
+
+		{#if isLoading}
+			<div class="loading-state">
+				<div class="spinner"></div>
+				<p>Loading account data...</p>
+			</div>
+		{:else}
+			<div class="settings-section">
 			<!-- Profile Information -->
 			<div class="section-title">Profile Information</div>
 
@@ -344,7 +345,19 @@
 				</button>
 			</div>
 		</div>
-	{/if}
+		{/if}
+	</div>
+
+	<!-- Footer -->
+	<footer class="account-footer">
+		<div class="footer-content">
+			<p class="footer-text">
+				📧 <a href="mailto:tegarerputra@outlook.com" class="footer-email-link">tegarerputra@outlook.com</a>
+				<span class="footer-separator">•</span>
+				© {new Date().getFullYear()} DuitTrack
+			</p>
+		</div>
+	</footer>
 </div>
 
 <!-- Confirmation Modal -->
@@ -391,11 +404,18 @@
 {/if}
 
 <style>
+	.settings-container {
+		min-height: calc(100vh - 4rem);
+		display: flex;
+		flex-direction: column;
+	}
+
 	.settings-page {
 		max-width: 800px;
 		margin: 0 auto;
 		padding: 2rem;
-		min-height: 100vh;
+		flex: 1;
+		width: 100%;
 	}
 
 	.page-header {
@@ -867,6 +887,70 @@
 
 		.modal-content {
 			padding: 1.5rem;
+		}
+	}
+
+	/* Account Footer */
+	.account-footer {
+		margin-top: auto;
+		padding: 24px 20px;
+		background: rgba(255, 255, 255, 0.6);
+		backdrop-filter: blur(20px);
+		-webkit-backdrop-filter: blur(20px);
+		border-top: 1px solid rgba(6, 182, 212, 0.1);
+		width: 100%;
+	}
+
+	.account-footer .footer-content {
+		max-width: 800px;
+		margin: 0 auto;
+		text-align: center;
+	}
+
+	.account-footer .footer-text {
+		font-size: 14px;
+		font-weight: 500;
+		color: #6b7280;
+		margin: 0;
+		line-height: 1.6;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.account-footer .footer-email-link {
+		color: #0891B2;
+		text-decoration: none;
+		transition: all 0.2s ease;
+		font-weight: 600;
+	}
+
+	.account-footer .footer-email-link:hover {
+		color: #06B6D4;
+		text-decoration: underline;
+	}
+
+	.account-footer .footer-separator {
+		color: #d1d5db;
+		font-weight: 400;
+		padding: 0 4px;
+	}
+
+	/* Mobile responsive footer */
+	@media (max-width: 430px) {
+		.account-footer {
+			padding: 20px 16px;
+		}
+
+		.account-footer .footer-text {
+			font-size: 13px;
+			gap: 6px;
+		}
+
+		.account-footer .footer-email-link {
+			font-size: 13px;
 		}
 	}
 </style>

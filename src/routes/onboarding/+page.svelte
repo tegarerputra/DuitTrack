@@ -494,6 +494,17 @@
         {/if}
       {/if}
     </div>
+
+    <!-- Footer -->
+    <footer class="onboarding-footer">
+      <div class="footer-content">
+        <p class="footer-text">
+          📧 <a href="mailto:tegarerputra@outlook.com" class="footer-email-link">tegarerputra@outlook.com</a>
+          <span class="footer-separator">•</span>
+          © {new Date().getFullYear()} DuitTrack
+        </p>
+      </div>
+    </footer>
   </div>
 </AuthGuard>
 
@@ -505,7 +516,9 @@
 
   /* Container - Light gradient background */
   .onboarding-container {
-    min-height: 100vh;
+    min-height: calc(100vh - 4rem);
+    display: flex;
+    flex-direction: column;
     background:
       radial-gradient(circle at 20% 80%, rgba(0, 191, 255, 0.08) 0%, transparent 50%),
       radial-gradient(circle at 80% 20%, rgba(30, 144, 255, 0.07) 0%, transparent 50%),
@@ -513,6 +526,12 @@
       linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
     position: relative;
     overflow: hidden;
+  }
+
+  .onboarding-container > .max-w-2xl {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
   }
 
   /* Floating background accents - Enhanced */
@@ -1430,6 +1449,72 @@
 
     .choice-question {
       font-size: 16px;
+    }
+  }
+
+  /* Onboarding Footer */
+  .onboarding-footer {
+    margin-top: auto;
+    padding: 24px 20px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(6, 182, 212, 0.1);
+    width: 100%;
+    position: relative;
+    z-index: 2;
+  }
+
+  .onboarding-footer .footer-content {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .onboarding-footer .footer-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .onboarding-footer .footer-email-link {
+    color: #0891B2;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-weight: 600;
+  }
+
+  .onboarding-footer .footer-email-link:hover {
+    color: #06B6D4;
+    text-decoration: underline;
+  }
+
+  .onboarding-footer .footer-separator {
+    color: #d1d5db;
+    font-weight: 400;
+    padding: 0 4px;
+  }
+
+  /* Mobile responsive footer */
+  @media (max-width: 430px) {
+    .onboarding-footer {
+      padding: 20px 16px;
+    }
+
+    .onboarding-footer .footer-text {
+      font-size: 13px;
+      gap: 6px;
+    }
+
+    .onboarding-footer .footer-email-link {
+      font-size: 13px;
     }
   }
 </style>

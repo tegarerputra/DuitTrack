@@ -4,7 +4,7 @@
  */
 
 import type { Insight, InsightContext } from '$lib/types/insights.types';
-import { formatRupiah } from './insightCalculators';
+import { formatRupiah } from '$utils/index';
 import { formatCategoryName } from './formatters';
 
 /**

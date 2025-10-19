@@ -5,9 +5,6 @@ import type { Expense } from '../types';
 // Main expense stores
 export const expensesStore: Writable<Expense[]> = writable([]);
 
-// Current month filter
-export const currentMonthStore: Writable<string> = writable(getCurrentMonth());
-
 // Loading state for expenses
 export const expensesLoadingStore: Writable<boolean> = writable(false);
 
@@ -40,7 +37,7 @@ export const filteredExpenses = derived(
     // Category filter
     if ($categoryFilter && $categoryFilter !== 'all') {
       filtered = filtered.filter(expense =>
-        expense.category.toLowerCase() === $categoryFilter.toLowerCase()
+        expense.category.toUpperCase() === $categoryFilter.toUpperCase()
       );
     }
 
@@ -71,36 +68,14 @@ export const filteredExpenses = derived(
   }
 );
 
-// Monthly expenses for current month
-export const currentMonthExpenses = derived(
-  [expensesStore, currentMonthStore],
-  ([$expenses, $currentMonth]) => {
-    return $expenses.filter(expense => {
-      const expenseDate = expense.date instanceof Date
-        ? expense.date
-        : expense.date.toDate();
-      const expenseMonth = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}`;
-      return expenseMonth === $currentMonth;
-    });
-  }
-);
-
-// Total expenses for current month
-export const currentMonthTotal = derived(
-  currentMonthExpenses,
-  ($currentMonthExpenses) => {
-    return $currentMonthExpenses.reduce((total, expense) => total + expense.amount, 0);
-  }
-);
-
-// Expenses grouped by category for current month
+// Expenses grouped by category (from filtered expenses)
 export const expensesByCategory = derived(
-  currentMonthExpenses,
-  ($currentMonthExpenses) => {
+  filteredExpenses,
+  ($filteredExpenses) => {
     const grouped: Record<string, { total: number; count: number; expenses: Expense[] }> = {};
 
-    $currentMonthExpenses.forEach(expense => {
-      const category = expense.category.toLowerCase();
+    $filteredExpenses.forEach(expense => {
+      const category = expense.category.toUpperCase();
       if (!grouped[category]) {
         grouped[category] = { total: 0, count: 0, expenses: [] };
       }
@@ -113,7 +88,7 @@ export const expensesByCategory = derived(
   }
 );
 
-// Top spending categories
+// Top spending categories (top 5)
 export const topCategories = derived(
   expensesByCategory,
   ($expensesByCategory) => {
@@ -129,13 +104,13 @@ export const topCategories = derived(
   }
 );
 
-// Daily expenses for charts
+// Daily expenses for charts (from filtered expenses)
 export const dailyExpenses = derived(
-  currentMonthExpenses,
-  ($currentMonthExpenses) => {
+  filteredExpenses,
+  ($filteredExpenses) => {
     const daily: Record<string, number> = {};
 
-    $currentMonthExpenses.forEach(expense => {
+    $filteredExpenses.forEach(expense => {
       const expenseDate = expense.date instanceof Date
         ? expense.date
         : expense.date.toDate();
@@ -149,50 +124,35 @@ export const dailyExpenses = derived(
   }
 );
 
-// Weekly spending trend
-export const weeklyTrend = derived(
-  expensesStore,
-  ($expenses) => {
-    const now = new Date();
-    const weeks: Array<{ week: string; total: number; count: number }> = [];
+// Grouped expenses by date for list display
+export const groupedExpensesByDate = derived(
+  filteredExpenses,
+  ($filteredExpenses) => {
+    const grouped: Record<string, Expense[]> = {};
 
-    for (let i = 7; i >= 0; i--) {
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - (i * 7 + 6));
-      weekStart.setHours(0, 0, 0, 0);
+    $filteredExpenses.forEach(expense => {
+      const date = expense.date instanceof Date ? expense.date : expense.date.toDate();
+      const dateKey = date.toISOString().split('T')[0];
 
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(expense);
+    });
 
-      const weekExpenses = $expenses.filter(expense => {
-        const expenseDate = expense.date instanceof Date
-          ? expense.date
-          : expense.date.toDate();
-        return expenseDate >= weekStart && expenseDate <= weekEnd;
-      });
-
-      const total = weekExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-      const weekLabel = `${weekStart.getDate()}/${weekStart.getMonth() + 1}`;
-
-      weeks.push({
-        week: weekLabel,
-        total,
-        count: weekExpenses.length
-      });
-    }
-
-    return weeks;
+    return Object.entries(grouped)
+      .map(([date, expenses]) => ({ date: new Date(date), expenses }))
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 );
 
-// Helper function to get current month
-function getCurrentMonth(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-}
+// Total of filtered expenses
+export const filteredExpensesTotal = derived(
+  filteredExpenses,
+  ($filteredExpenses) => {
+    return $filteredExpenses.reduce((total, expense) => total + expense.amount, 0);
+  }
+);
 
 // Store actions
 export const expenseActions = {
@@ -237,11 +197,6 @@ export const expenseActions = {
     selectedExpenseStore.set(expense);
   },
 
-  // Change month filter
-  setCurrentMonth: (month: string) => {
-    currentMonthStore.set(month);
-  },
-
   // Set category filter
   setCategoryFilter: (category: string) => {
     categoryFilterStore.set(category);
@@ -280,46 +235,11 @@ export const expenseActions = {
     expensesStore.update(expenses =>
       expenses.filter(expense => expense.id !== expenseId)
     );
-  },
-
-  // Load expenses for a specific period
-  loadExpenses: async (periodId: string) => {
-    expensesLoadingStore.set(true);
-    expensesErrorStore.set(null);
-
-    // Simulate loading with mock data
-    setTimeout(() => {
-      const mockExpenses: Expense[] = [
-        {
-          id: '1',
-          amount: 50000,
-          category: 'FOOD',
-          description: 'Lunch at restaurant',
-          date: new Date(),
-          userId: 'current_user'
-        },
-        {
-          id: '2',
-          amount: 25000,
-          category: 'TRANSPORT',
-          description: 'Grab ride',
-          date: new Date(),
-          userId: 'current_user'
-        }
-      ];
-
-      expensesStore.set(mockExpenses);
-      expensesLoadingStore.set(false);
-    }, 800);
   }
 };
 
-// Compatibility alias for components expecting expenseStore
+// Compatibility export for dashboard and other pages that use expenseStore
+// This maintains backward compatibility while the new structure is being adopted
 export const expenseStore = {
-  subscribe: expensesStore.subscribe,
-  loadExpenses: (periodId: string) => {
-    // Mock implementation - should integrate with real data service
-    console.log('Loading expenses for period:', periodId);
-    return Promise.resolve([]);
-  }
+  subscribe: expensesStore.subscribe
 };

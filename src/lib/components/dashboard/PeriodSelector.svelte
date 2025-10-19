@@ -13,12 +13,26 @@
     const periods = [];
     const today = new Date();
 
-    for (let i = 0; i < 6; i++) {
-      const targetDate = new Date(today.getFullYear(), today.getMonth() - i, userResetDate);
+    // 🔥 FIX: Determine actual current period based on reset date
+    // If today >= resetDate, current period starts this month
+    // If today < resetDate, current period started last month
+    let currentPeriodStart;
+    if (today.getDate() >= userResetDate) {
+      currentPeriodStart = new Date(today.getFullYear(), today.getMonth(), userResetDate);
+    } else {
+      currentPeriodStart = new Date(today.getFullYear(), today.getMonth() - 1, userResetDate);
+    }
 
-      // Calculate period boundaries
-      const periodStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), userResetDate);
-      const periodEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, userResetDate - 1);
+    for (let i = 0; i < 6; i++) {
+      // Calculate period start by going back i months from current period
+      const periodStart = new Date(
+        currentPeriodStart.getFullYear(),
+        currentPeriodStart.getMonth() - i,
+        userResetDate
+      );
+
+      // Calculate period end (next month, day before reset)
+      const periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, userResetDate - 1);
 
       // Format period ID as YYYY-MM-DD
       const year = periodStart.getFullYear();
@@ -37,6 +51,12 @@
         start: periodStart,
         end: periodEnd
       });
+    }
+
+    // Log current period calculation for debugging
+    if (periods.length > 0) {
+      console.log(`📅 PeriodSelector: Today=${today.toISOString().split('T')[0]}, ResetDate=${userResetDate}`);
+      console.log(`📅 Current Period: ${periods[0].id} (${periods[0].start.toLocaleDateString('id-ID')} - ${periods[0].end.toLocaleDateString('id-ID')})`);
     }
 
     return periods;
@@ -99,6 +119,20 @@
 
   $: availablePeriods = generateAvailablePeriods();
   $: currentPeriod = availablePeriods.find(p => p.id === currentPeriodId) || availablePeriods[0];
+
+  // 🔥 FIX: When userResetDate changes, regenerate periods and update currentPeriodId
+  $: if (userResetDate) {
+    const newPeriods = generateAvailablePeriods();
+    const newCurrentPeriod = newPeriods.find(p => p.isCurrent);
+
+    // If current periodId doesn't exist in new periods, switch to new current period
+    const periodExists = newPeriods.find(p => p.id === currentPeriodId);
+    if (!periodExists && newCurrentPeriod) {
+      console.log(`🔄 PeriodSelector: Reset date changed to ${userResetDate}, switching period from ${currentPeriodId} to ${newCurrentPeriod.id}`);
+      selectedPeriodStore.set(newCurrentPeriod.id);
+      dispatch('periodChange', { periodId: newCurrentPeriod.id });
+    }
+  }
 </script>
 
 <div class="period-selector-wrapper">
