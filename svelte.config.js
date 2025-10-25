@@ -1,4 +1,4 @@
-import adapter from '@sveltejs/adapter-static';
+import adapter from '@sveltejs/adapter-netlify';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 /** @type {import('@sveltejs/kit').Config} */
@@ -7,11 +7,8 @@ const config = {
 
   kit: {
     adapter: adapter({
-      pages: 'build',
-      assets: 'build',
-      fallback: 'index.html',
-      precompress: false,
-      strict: true
+      edge: false,
+      split: false
     }),
 
     // Path configuration for Netlify deployment
@@ -30,18 +27,6 @@ const config = {
         '/expenses',
         '/analytics'
       ]
-    },
-
-    // Security configuration for fintech app
-    csp: {
-      mode: 'auto',
-      directives: {
-        'script-src': ['self', 'unsafe-inline', 'https://www.gstatic.com', 'https://apis.google.com'],
-        'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com'],
-        'font-src': ['self', 'https://fonts.gstatic.com'],
-        'connect-src': ['self', 'https://*.firebaseapp.com', 'https://*.googleapis.com'],
-        'img-src': ['self', 'data:', 'https:'],
-      }
     },
 
     // Service worker configuration
