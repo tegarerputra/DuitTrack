@@ -94,23 +94,7 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
-# Redirect rules
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-# SPA fallback - serve index.html for all routes
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-# Custom error pages
-[[redirects]]
-  from = "/404"
-  to = "/404.html"
-  status = 404
+# Redirects moved to static/_redirects file (required by @sveltejs/adapter-netlify)
 
 # Environment variables (use Netlify UI to set actual values)
 # FIREBASE_API_KEY
