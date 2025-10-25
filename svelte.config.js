@@ -11,30 +11,6 @@ const config = {
       split: false
     }),
 
-    // Path configuration for Netlify deployment
-    paths: {
-      base: process.env.NODE_ENV === 'production' ? '' : '',
-    },
-
-    // Prerendering configuration for better SEO
-    prerender: {
-      handleHttpError: 'warn',
-      handleMissingId: 'warn',
-      entries: [
-        '/',
-        '/dashboard',
-        '/budget',
-        '/expenses',
-        '/analytics'
-      ]
-    },
-
-    // Service worker configuration
-    serviceWorker: {
-      register: true,
-      files: (filepath) => !/\.DS_Store/.test(filepath)
-    },
-
     // Alias configuration matching vite.config.js
     alias: {
       '$components': 'src/lib/components',
