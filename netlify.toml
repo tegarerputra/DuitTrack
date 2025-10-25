@@ -10,10 +10,6 @@
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
 
-# SvelteKit adapter configuration
-[[plugins]]
-  package = "@sveltejs/adapter-netlify"
-
 # Security Headers for fintech application
 [[headers]]
   for = "/*"
