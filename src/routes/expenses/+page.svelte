@@ -16,6 +16,9 @@
     expensesLoadingStore
   } from '../../lib/stores/expenses';
   import { budgetStore, budgetCategoriesStore } from '../../lib/stores/budget';
+  import { expenseService } from '../../lib/services/expenseService';
+  import { budgetService } from '../../lib/services/budgetService';
+  import { periodService } from '../../lib/services/periodService';
   import InlineCategorySelector from '../../lib/components/expense/InlineCategorySelector.svelte';
   import PeriodSelector from '$lib/components/dashboard/PeriodSelector.svelte';
   import { userProfileStore } from '$stores/auth';
@@ -23,13 +26,18 @@
   import { formatIDR, formatDate as formatDateUtil } from '$lib/utils/index';
   import { getCategoryIcon, formatCategoryName } from '$lib/utils/categoryHelpers';
 
+  // Skeleton Components
+  import SkeletonHero from '$lib/components/skeleton/SkeletonHero.svelte';
+  import SkeletonCard from '$lib/components/skeleton/SkeletonCard.svelte';
+  import SkeletonList from '$lib/components/skeleton/SkeletonList.svelte';
+
   // Navigation context
   let returnPath = '';
   let selectedCategory = '';
   let searchQuery = '';
   let expenses: any[] = [];
   let categories: any[] = [];
-  let isLoading = false;
+  let isLoading = true; // ✅ Start with true for instant skeleton
   let showChart = true;
   let currentPeriodId = '';
   let userProfile: any = null;
@@ -50,7 +58,10 @@
     }
   });
 
-  onMount(() => {
+  onMount(async () => {
+    // Import utility upfront
+    const { validatePeriodResetDate } = await import('$lib/utils/dummyData');
+
     // Check if there's a stored period in the shared store
     const storedPeriod = $selectedPeriodStore;
     if (storedPeriod) {
@@ -65,13 +76,11 @@
       if (profile) {
         userProfile = profile;
 
-        // 🔥 FIX: If userProfile has different resetDate, clear stored period to force regeneration
+        // 🔥 FIX: Validate stored period against user's reset date using centralized utility
         const storedPeriod = $selectedPeriodStore;
         if (storedPeriod && profile.budgetResetDate) {
-          // Extract day from stored period (format: YYYY-MM-DD)
-          const storedDay = parseInt(storedPeriod.split('-')[2]);
-          if (storedDay !== profile.budgetResetDate) {
-            console.log(`⚠️ Reset date changed from ${storedDay} to ${profile.budgetResetDate}, clearing period`);
+          if (!validatePeriodResetDate(storedPeriod, profile.budgetResetDate)) {
+            console.log(`⚠️ Reset date changed, clearing period`);
             selectedPeriodStore.clear();
             currentPeriodId = '';
           }
@@ -126,19 +135,35 @@
   async function loadExpensesData() {
     expenseActions.setLoading(true);
 
-    // TEMPORARY: Load dummy data for development with period support
-    setTimeout(async () => {
-      const { generateDummyExpensesForPeriod } = await import('$lib/utils/dummyData');
-      // Generate expenses for the selected period
-      const periodExpenses = generateDummyExpensesForPeriod(currentPeriodId, 25);
+    try {
+      // 🔥 FIREBASE: Load expenses from Firestore
+      const periodExpenses = await expenseService.getExpensesByPeriod(currentPeriodId);
 
-      // Set expenses in store
+      // Update expense store
       expenseActions.setExpenses(periodExpenses);
-      expenseActions.setLoading(false);
 
-      console.log(`📊 Dummy expenses loaded for Expenses page - Period: ${currentPeriodId}`);
-      console.log(`🔍 [EXPENSES] PeriodID: ${currentPeriodId}, ResetDate: ${userProfile?.budgetResetDate || 25}, Total: Rp ${periodExpenses.reduce((s: number, e: any) => s + e.amount, 0).toLocaleString('id-ID')}`);
-    }, 800);
+      // Also load budget for category information
+      const budget = await budgetService.getBudgetByPeriod(currentPeriodId);
+      if (budget) {
+        budgetStore.set({
+          categories: budget.categories,
+          totalBudget: budget.totalBudget,
+          totalSpent: budget.totalSpent
+        });
+      }
+
+      const totalAmount = periodExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+
+      console.log('✅ Expenses loaded from Firebase');
+      console.log(`📊 Period: ${currentPeriodId}`);
+      console.log('📈 Total Expenses:', periodExpenses.length);
+      console.log('💰 Total Amount:', totalAmount);
+    } catch (error) {
+      console.error('Error loading expenses data:', error);
+      expenseActions.setError('Failed to load expenses');
+    } finally {
+      expenseActions.setLoading(false);
+    }
   }
 
   // Handle period change from PeriodSelector
@@ -151,17 +176,9 @@
   }
 
   async function loadCategories() {
-    // Get categories from budgetCategoriesStore
-    budgetCategoriesStore.subscribe(budgetCategories => {
-      if (budgetCategories && budgetCategories.length > 0) {
-        categories = budgetCategories.map(cat => ({
-          value: cat.id.toUpperCase(),
-          label: cat.name,
-          icon: cat.icon
-        }));
-        console.log('📋 Categories loaded:', categories);
-      }
-    });
+    // 🧪 TESTING MODE: EMPTY CATEGORIES
+    categories = [];
+    console.log('🧪 TESTING: Categories - Empty state');
   }
 
   function handleCategoryFilter(category: string) {
@@ -213,21 +230,34 @@
     }
   }
 
-  function handleCategoryChange(expense: any, event: CustomEvent) {
+  async function handleCategoryChange(expense: any, event: CustomEvent) {
     const { newCategory } = event.detail;
 
-    // Update the category
-    expenseActions.changeExpenseCategory(expense.id, newCategory);
+    try {
+      // 🔥 FIREBASE: Update category in Firestore
+      await expenseService.updateExpense(expense.id, { category: newCategory });
 
-    // Close the selector and dropdown
-    activeExpenseId = null;
-    categoryDropdownOpen[expense.id] = false;
+      // Update local store
+      expenseActions.changeExpenseCategory(expense.id, newCategory);
 
-    // Show simple success toast
-    toast.success(`Kategori diubah ke ${formatCategoryName(newCategory)}`, {
-      duration: 3000,
-      style: 'background: linear-gradient(135deg, rgba(0, 191, 255, 0.9), rgba(30, 144, 255, 0.95)); color: white; padding: 12px 16px; border-radius: 12px;'
-    });
+      // 🔥 FIREBASE: Sync budget
+      await periodService.syncBudgetWithExpenses(currentPeriodId);
+
+      // Close the selector and dropdown
+      activeExpenseId = null;
+      categoryDropdownOpen[expense.id] = false;
+
+      // Show simple success toast
+      toast.success(`Kategori diubah ke ${formatCategoryName(newCategory)}`, {
+        duration: 3000,
+        style: 'background: linear-gradient(135deg, rgba(0, 191, 255, 0.9), rgba(30, 144, 255, 0.95)); color: white; padding: 12px 16px; border-radius: 12px;'
+      });
+    } catch (error) {
+      console.error('Error updating expense category:', error);
+      toast.error('Gagal mengubah kategori. Silakan coba lagi.', {
+        duration: 3000
+      });
+    }
   }
 
   // Handle dropdown toggle from child component
@@ -237,7 +267,7 @@
     categoryDropdownOpen = { ...categoryDropdownOpen };
   }
 
-  function handleDeleteExpense(expense: any, event: Event) {
+  async function handleDeleteExpense(expense: any, event: Event) {
     event.stopPropagation();
 
     // Store expense info for confirmation
@@ -251,17 +281,30 @@
     const confirmed = confirm(`🗑️ Hapus expense ini?\n\n${expenseInfo.category} - ${expenseInfo.amount}\n\nKlik OK untuk menghapus atau Cancel untuk membatalkan.`);
 
     if (confirmed) {
-      // Delete the expense
-      expenseActions.deleteExpense(expense.id);
+      try {
+        // 🔥 FIREBASE: Delete from Firestore
+        await expenseService.deleteExpense(expense.id);
 
-      // Close active state
-      activeExpenseId = null;
+        // Delete from local store
+        expenseActions.deleteExpense(expense.id);
 
-      // Show success toast
-      toast.success('✓ Expense berhasil dihapus', {
-        duration: 3000,
-        style: 'background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.95)); color: white; padding: 12px 16px; border-radius: 12px;'
-      });
+        // 🔥 FIREBASE: Sync budget
+        await periodService.syncBudgetWithExpenses(currentPeriodId);
+
+        // Close active state
+        activeExpenseId = null;
+
+        // Show success toast
+        toast.success('✓ Expense berhasil dihapus', {
+          duration: 3000,
+          style: 'background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.95)); color: white; padding: 12px 16px; border-radius: 12px;'
+        });
+      } catch (error) {
+        console.error('Error deleting expense:', error);
+        toast.error('Gagal menghapus expense. Silakan coba lagi.', {
+          duration: 3000
+        });
+      }
     }
   }
 
@@ -289,11 +332,17 @@
 
       <!-- Period Selector -->
       <div class="header-actions">
-        <PeriodSelector
-          currentPeriodId={currentPeriodId}
-          userResetDate={userProfile?.budgetResetDate || 25}
-          on:periodChange={handlePeriodChange}
-        />
+        {#if userProfile}
+          <PeriodSelector
+            currentPeriodId={currentPeriodId}
+            userResetDate={userProfile.budgetResetDate || 25}
+            on:periodChange={handlePeriodChange}
+          />
+        {:else}
+          <div class="period-selector-loading">
+            <div class="loading-skeleton"></div>
+          </div>
+        {/if}
       </div>
     </div>
   </div>
@@ -301,83 +350,93 @@
   <!-- Main Content Grid -->
   <div class="expenses-grid">
 
-    <!-- HERO SECTION - Following Dashboard Pattern -->
-    <div class="hero-summary-container">
-      <div class="hero-summary-card hero-glassmorphism liquid-card">
-        <div class="hero-glass-overlay"></div>
+    {#if isLoading}
+      <!-- Unified Skeleton Loading -->
+      <div class="hero-summary-container">
+        <SkeletonHero variant="expense" />
+      </div>
 
-        <!-- Enhanced Background Elements -->
-        <div class="hero-bg-elements">
-          <div class="hero-circle hero-circle-1 animate-liquid-float"></div>
-          <div class="hero-circle hero-circle-2 animate-liquid-float"></div>
-          <div class="hero-wave animate-liquid-flow"></div>
-          <div class="hero-glass-particle hero-particle-1"></div>
-          <div class="hero-glass-particle hero-particle-2"></div>
-          <div class="hero-glass-particle hero-particle-3"></div>
-        </div>
+      <SkeletonCard variant="filters" />
 
-        <!-- Hero Content -->
-        <div class="hero-content">
-          <div class="hero-header">
-            <h1 class="hero-title">💸 Total Expenses</h1>
+      <SkeletonList count={10} variant="expense" />
+    {:else}
+      <!-- HERO SECTION - Following Dashboard Pattern -->
+      <div class="hero-summary-container">
+        <div class="hero-summary-card hero-glassmorphism liquid-card">
+          <div class="hero-glass-overlay"></div>
+
+          <!-- Enhanced Background Elements -->
+          <div class="hero-bg-elements">
+            <div class="hero-circle hero-circle-1 animate-liquid-float"></div>
+            <div class="hero-circle hero-circle-2 animate-liquid-float"></div>
+            <div class="hero-wave animate-liquid-flow"></div>
+            <div class="hero-glass-particle hero-particle-1"></div>
+            <div class="hero-glass-particle hero-particle-2"></div>
+            <div class="hero-glass-particle hero-particle-3"></div>
           </div>
 
-          <div class="hero-amount">
-            <div class="amount-section-hero">
-              <span class="amount-label">TOTAL SPENDING</span>
-              <div class="amount-display-new">
-                <span class="main-amount-large">{formatIDR(totalExpenses)}</span>
+          <!-- Hero Content -->
+          <div class="hero-content">
+            <div class="hero-header">
+              <h1 class="hero-title">💸 Total Expenses</h1>
+            </div>
+
+            <div class="hero-amount">
+              <div class="amount-section-hero">
+                <span class="amount-label">TOTAL SPENDING</span>
+                <div class="amount-display-new">
+                  <span class="main-amount-large">{formatIDR(totalExpenses)}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {#if showChart && chartData.length > 0}
-            <!-- Hero Chart -->
-            <div class="hero-chart-container">
-              <div class="chart-title-hero">Daily Spending Pattern</div>
-              <div class="enhanced-chart">
-                {#each chartData as day}
-                  <div class="chart-bar-enhanced" style="height: {(day.amount / Math.max(...chartData.map(d => d.amount))) * 100}%">
-                    <div class="chart-tooltip-enhanced">
-                      <div class="tooltip-date">{new Date(day.date).getDate()}</div>
-                      <div class="tooltip-amount">{formatIDR(day.amount)}</div>
+            {#if showChart && chartData.length > 0}
+              <!-- Hero Chart -->
+              <div class="hero-chart-container">
+                <div class="chart-title-hero">Daily Spending Pattern</div>
+                <div class="enhanced-chart">
+                  {#each chartData as day}
+                    <div class="chart-bar-enhanced" style="height: {(day.amount / Math.max(...chartData.map(d => d.amount))) * 100}%">
+                      <div class="chart-tooltip-enhanced">
+                        <div class="tooltip-date">{new Date(day.date).getDate()}</div>
+                        <div class="tooltip-amount">{formatIDR(day.amount)}</div>
+                      </div>
                     </div>
-                  </div>
-                {/each}
+                  {/each}
+                </div>
               </div>
-            </div>
-          {/if}
+            {/if}
 
-          <!-- Integrated Spending Insights -->
-          {#if expenses.length > 0 && totalExpenses > 0}
-            <div class="hero-insights">
-              <div class="hero-insight-item">
-                <span class="hero-insight-icon">🏆</span>
-                <span class="hero-insight-text">
-                  Top: {(() => {
-                    const foodTotal = expenses.filter(e => e.category === 'FOOD').reduce((sum, e) => sum + e.amount, 0);
-                    const percentage = Math.round((foodTotal / totalExpenses) * 100);
-                    return `Makanan (${percentage}%)`;
-                  })()}
-                </span>
+            <!-- Integrated Spending Insights -->
+            {#if expenses.length > 0 && totalExpenses > 0}
+              <div class="hero-insights">
+                <div class="hero-insight-item">
+                  <span class="hero-insight-icon">🏆</span>
+                  <span class="hero-insight-text">
+                    Top: {(() => {
+                      const foodTotal = expenses.filter(e => e.category === 'FOOD').reduce((sum, e) => sum + e.amount, 0);
+                      const percentage = Math.round((foodTotal / totalExpenses) * 100);
+                      return `Makanan (${percentage}%)`;
+                    })()}
+                  </span>
+                </div>
+                <div class="hero-insight-item">
+                  <span class="hero-insight-icon">📈</span>
+                  <span class="hero-insight-text">Daily avg: {formatIDR(totalExpenses / 30)}</span>
+                </div>
+                <div class="hero-insight-item">
+                  <span class="hero-insight-icon">📅</span>
+                  <span class="hero-insight-text">Active: {new Set(expenses.map(e => e.date.toDateString())).size} days</span>
+                </div>
               </div>
-              <div class="hero-insight-item">
-                <span class="hero-insight-icon">📈</span>
-                <span class="hero-insight-text">Daily avg: {formatIDR(totalExpenses / 30)}</span>
-              </div>
-              <div class="hero-insight-item">
-                <span class="hero-insight-icon">📅</span>
-                <span class="hero-insight-text">Active: {new Set(expenses.map(e => e.date.toDateString())).size} days</span>
-              </div>
-            </div>
-          {/if}
+            {/if}
+          </div>
         </div>
       </div>
-    </div>
 
 
-    <!-- Filters Section -->
-    <div class="filters-section secondary-glassmorphism">
+      <!-- Filters Section -->
+      <div class="filters-section secondary-glassmorphism">
       <div class="search-container">
         <input
           type="text"
@@ -420,12 +479,7 @@
 
     <!-- Expenses List -->
     <div class="expenses-list">
-      {#if isLoading}
-        <div class="loading-container secondary-glassmorphism">
-          <div class="loading-spinner"></div>
-          <p>Loading expenses...</p>
-        </div>
-      {:else if expenses.length === 0}
+      {#if expenses.length === 0}
         <div class="empty-state secondary-glassmorphism">
           <div class="empty-icon">📊</div>
           <h3>No expenses found</h3>
@@ -504,6 +558,7 @@
     <button class="floating-add-button" on:click={handleAddExpense}>
       +
     </button>
+    {/if}
   </div>
 
   <!-- Footer -->
@@ -588,6 +643,32 @@
     display: flex;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  /* Period Selector Loading State */
+  .period-selector-loading {
+    width: 100%;
+    max-width: 280px;
+    padding: 10px 14px;
+    background: rgba(6, 182, 212, 0.05);
+    border: 1px solid rgba(6, 182, 212, 0.15);
+    border-radius: 12px;
+  }
+
+  .loading-skeleton {
+    height: 20px;
+    background: linear-gradient(90deg,
+      rgba(6, 182, 212, 0.1) 0%,
+      rgba(6, 182, 212, 0.2) 50%,
+      rgba(6, 182, 212, 0.1) 100%);
+    background-size: 200% 100%;
+    border-radius: 4px;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 
   /* Main Grid Layout */

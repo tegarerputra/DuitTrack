@@ -233,9 +233,16 @@ export function getDaysRemainingInPeriod(period: Period): number {
  */
 export function getTotalDaysInPeriod(period: Period): number {
   const start = new Date(period.startDate);
+  start.setHours(0, 0, 0, 0);
+
   const end = new Date(period.endDate);
+  end.setHours(0, 0, 0, 0);
+
   const diffTime = end.getTime() - start.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
+  const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+  // Add 1 to include both start and end days (e.g., Jan 1 to Jan 31 = 31 days)
+  return diffDays + 1;
 }
 
 /**

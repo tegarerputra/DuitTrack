@@ -6,6 +6,9 @@
 	import { toastStore } from '$lib/stores/toast';
 	import ToastContainer from '$lib/components/ui/ToastContainer.svelte';
 
+	// Skeleton Components
+	import SkeletonCard from '$lib/components/skeleton/SkeletonCard.svelte';
+
 	// State
 	let isLoading = true;
 	let isSaving = false;
@@ -202,10 +205,7 @@
 		</div>
 
 		{#if isLoading}
-			<div class="loading-state">
-				<div class="spinner"></div>
-				<p>Loading account data...</p>
-			</div>
+			<SkeletonCard variant="form" rows={5} />
 		{:else}
 			<div class="settings-section">
 			<!-- Profile Information -->

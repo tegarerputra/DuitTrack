@@ -1,5 +1,6 @@
 // Navigation context store for smart navigation and state preservation
 import { writable, derived, type Writable } from 'svelte/store';
+import { navigating } from '$app/stores';
 
 export interface NavigationContext {
   currentPage: string;
@@ -442,5 +443,49 @@ export function createNavigationMiddleware() {
     }
   };
 }
+
+// Page-specific loading states for instant skeleton display
+export const pageLoadingState = writable<{
+  isNavigating: boolean;
+  targetPath: string | null;
+  startTime: number | null;
+}>({
+  isNavigating: false,
+  targetPath: null,
+  startTime: null
+});
+
+// Derive loading state from SvelteKit's navigating store
+navigating.subscribe(nav => {
+  if (nav) {
+    // Navigation started - show skeleton immediately
+    pageLoadingState.set({
+      isNavigating: true,
+      targetPath: nav.to?.url.pathname || null,
+      startTime: Date.now()
+    });
+  } else {
+    // Navigation completed - hide skeleton
+    pageLoadingState.set({
+      isNavigating: false,
+      targetPath: null,
+      startTime: null
+    });
+  }
+});
+
+// Helper to check if navigating to specific page
+export const isNavigatingTo = derived(
+  pageLoadingState,
+  $state => (path: string) => {
+    return $state.isNavigating && $state.targetPath === path;
+  }
+);
+
+// Global loading state (for any navigation)
+export const isPageNavigating = derived(
+  pageLoadingState,
+  $state => $state.isNavigating
+);
 
 // Stores are already exported above with their declarations

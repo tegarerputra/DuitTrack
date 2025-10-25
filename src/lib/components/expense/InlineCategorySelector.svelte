@@ -134,20 +134,31 @@
       bind:this={dropdownElement}
       transition:slide={{ duration: 200, easing: quintOut }}
     >
-      {#each categories as category}
-        <button
-          class="category-option"
-          class:active={category.value.toUpperCase() === currentCategory.toUpperCase()}
-          on:click={(e) => handleCategorySelect(category.value, e)}
-          type="button"
-        >
-          <span class="category-icon">{getCategoryIcon(category.value)}</span>
-          <span class="category-label">{category.label}</span>
-          {#if category.value.toUpperCase() === currentCategory.toUpperCase()}
-            <span class="checkmark">✓</span>
-          {/if}
-        </button>
-      {/each}
+      {#if categories.length === 0}
+        <!-- Empty state when no categories are set up -->
+        <div class="empty-state">
+          <div class="empty-icon">💡</div>
+          <div class="empty-message">
+            <div class="empty-title">Belum Ada Kategori</div>
+            <div class="empty-subtitle">Setup budget terlebih dahulu untuk menambahkan kategori pengeluaran</div>
+          </div>
+        </div>
+      {:else}
+        {#each categories as category}
+          <button
+            class="category-option"
+            class:active={category.value.toUpperCase() === currentCategory.toUpperCase()}
+            on:click={(e) => handleCategorySelect(category.value, e)}
+            type="button"
+          >
+            <span class="category-icon">{getCategoryIcon(category.value)}</span>
+            <span class="category-label">{category.label}</span>
+            {#if category.value.toUpperCase() === currentCategory.toUpperCase()}
+              <span class="checkmark">✓</span>
+            {/if}
+          </button>
+        {/each}
+      {/if}
     </div>
   </Portal>
 {/if}
@@ -268,6 +279,39 @@
     font-weight: bold;
     font-size: 1.1rem;
     flex-shrink: 0;
+  }
+
+  /* Empty state styling */
+  .empty-state {
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .empty-icon {
+    font-size: 2.5rem;
+    opacity: 0.8;
+  }
+
+  .empty-message {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .empty-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .empty-subtitle {
+    font-size: 0.85rem;
+    color: #6b7280;
+    line-height: 1.4;
   }
 
   /* Mobile optimization */

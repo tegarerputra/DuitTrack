@@ -2,14 +2,20 @@
   import { onMount, createEventDispatcher } from 'svelte';
   import { writable, derived } from 'svelte/store';
   import { authService } from '../../services/authService';
+  import { budgetService, DEFAULT_CATEGORIES } from '../../services/budgetService';
+  import { periodService } from '../../services/periodService';
   import { DataService } from '../../services/dataService';
   import { toastStore } from '../../stores/toast';
   import { userProfileStore } from '../../stores/auth';
   import { selectedPeriodStore } from '../../stores/period';
-  import LoadingSkeleton from './LoadingSkeleton.svelte';
   import CategoryBudgetItem from './CategoryBudgetItem.svelte';
   import ToastContainer from '../ui/ToastContainer.svelte';
   import PeriodSelector from '../dashboard/PeriodSelector.svelte';
+
+  // Skeleton Components
+  import SkeletonHero from '../skeleton/SkeletonHero.svelte';
+  import SkeletonCard from '../skeleton/SkeletonCard.svelte';
+  import SkeletonList from '../skeleton/SkeletonList.svelte';
 
   const dispatch = createEventDispatcher();
 
@@ -30,7 +36,7 @@
   });
   let userProfile: any = null;
   let categories: any[] = [];
-  let isLoading = false;
+  let isLoading = true; // ✅ Start with true for instant skeleton
   let dataService: DataService | null = null;
   let showAddCategoryForm = false;
   let newCategoryData = {
@@ -436,10 +442,7 @@
     try {
       isLoading = true;
 
-      // Add minimum loading delay for better UX
-      const loadingStartTime = Date.now();
-      const minimumLoadingTime = 800;
-
+      // ✅ INSTANT LOADING - No artificial delay for better UX
       // Load budget data using the new DataService
       const periods = await dataService.getPeriods();
       const currentPeriod = periods.find(p => p.id === currentPeriodId);
@@ -469,14 +472,6 @@
         // No budget data found
         categories = [];
         budgetData.set(null);
-      }
-
-      // Ensure minimum loading time for skeleton visibility
-      const loadingElapsed = Date.now() - loadingStartTime;
-      const remainingTime = Math.max(0, minimumLoadingTime - loadingElapsed);
-
-      if (remainingTime > 0) {
-        await new Promise(resolve => setTimeout(resolve, remainingTime));
       }
 
     } catch (error) {
@@ -511,10 +506,8 @@
         };
       });
 
-      // Persist to database
-      if (dataService) {
-        // This would need to be implemented in DataService
-        // await dataService.updateCategoryBudget(currentPeriodId, categoryId, newBudget);
+      // 🔥 FIREBASE: Update category budget in Firestore
+      await budgetService.updateCategoryBudget(currentPeriodId, categoryId, newBudget);
       }
 
       console.log(`✅ Budget updated for ${categoryId}: ${formatCurrency(newBudget)}`);
@@ -527,6 +520,10 @@
     try {
       const categoryName = categories.find(cat => cat.id === categoryId)?.name || categoryId;
 
+      // 🔥 FIREBASE: Remove category from Firestore
+      await budgetService.removeCategory(currentPeriodId, categoryId);
+
+      // Update local state
       categories = categories.filter(cat => cat.id !== categoryId);
 
       budgetData.update(data => {
@@ -571,17 +568,8 @@
         };
       });
 
-      // Persist to database if DataService is available
-      if (dataService && currentPeriodId) {
-        // First, create the category in the categories collection
-        await dataService.createCategory({
-          name: categoryData.name,
-          icon: categoryData.emoji,
-          color: getRandomCategoryColor(),
-          type: 'expense',
-          isCustom: true,
-          userId: ''  // Will be set by DataService
-        });
+      // 🔥 FIREBASE: Add category to budget in Firestore
+      await budgetService.addCategory(currentPeriodId, categoryData.id, categoryData.budget);
 
         // Then, add the budget to the current period
         await dataService.addCategoryBudgetToPeriod(
@@ -841,45 +829,53 @@
   }
 
   async function loadDummyData() {
-    // Import centralized dummy data
-    const { getDummyCategories, generateDummyExpensesForPeriod } = await import('$lib/utils/dummyData');
+  try {
+    // Set loading to true at the start
+    isLoading = true;
 
-    // IMPORTANT: Use period-specific expenses to sync with Dashboard
-    const expenses = generateDummyExpensesForPeriod(currentPeriodId, 25);
+    // 🔥 FIREBASE: Load budget from Firestore
+    const budget = await budgetService.getBudgetByPeriod(currentPeriodId);
 
-    // Calculate spent per category from actual expenses
-    const categorySpending: Record<string, number> = {};
-    expenses.forEach((expense: any) => {
-      const categoryId = expense.category.toUpperCase(); // ✅ Match UPPERCASE category IDs
-      categorySpending[categoryId] = (categorySpending[categoryId] || 0) + expense.amount;
-    });
+    if (budget && budget.categories) {
+      // Budget exists - convert to categories array
+      categories = Object.entries(budget.categories).map(([id, data]: [string, any]) => {
+        const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === id);
+        return {
+          id,
+          name: defaultCat?.name || id,
+          emoji: defaultCat?.emoji || '💰',
+          budget: data.budget,
+          spent: data.spent,
+          remaining: data.budget - data.spent,
+          percentage: data.budget > 0 ? (data.spent / data.budget) * 100 : 0
+        };
+      });
 
-    // Get categories with budget amounts
-    const dummyCategories = getDummyCategories();
+      budgetData.set({
+        categories: budget.categories,
+        totalBudget: budget.totalBudget,
+        totalSpent: budget.totalSpent
+      });
 
-    // Combine budget with REAL spending from expenses
-    categories = dummyCategories.map(cat => ({
-      ...cat,
-      spent: categorySpending[cat.id] || 0  // Use real spending from expenses (cat.id is UPPERCASE)
-    }));
-
-    // Calculate totals
-    const totalBudget = categories.reduce((sum, cat) => sum + cat.budget, 0);
-    const totalSpent = categories.reduce((sum, cat) => sum + cat.spent, 0);
-
-    budgetData.set({
-      categories: Object.fromEntries(
-        categories.map(cat => [cat.id, { budget: cat.budget, spent: cat.spent }])
-      ),
-      totalBudget,
-      totalSpent
-    });
-
-    console.log(`📊 Budget dummy data loaded for period: ${currentPeriodId}`);
-    console.log(`🔍 [BUDGET] PeriodID: ${currentPeriodId}, ResetDate: ${userResetDate}, Total: Rp ${totalSpent.toLocaleString('id-ID')}`);
-    console.log('💰 Budget total spent:', totalSpent);
-    console.log('📈 Category spending:', categorySpending);
+      console.log('✅ Budget loaded from Firebase:', budget);
+      console.log('📊 Categories:', categories.length);
+    } else {
+      // No budget found - empty state
+      categories = [];
+      budgetData.set({
+        categories: {},
+        totalBudget: 0,
+        totalSpent: 0
+      });
+      console.log('ℹ️ No budget found, showing empty state');
+    }
+  } catch (error) {
+    console.error('❌ Error loading budget data:', error);
+    categories = [];
+  } finally {
+    isLoading = false;
   }
+}
 </script>
 
 <ToastContainer />
@@ -895,11 +891,17 @@
 
       <!-- Period Selector -->
       <div class="header-actions">
-        <PeriodSelector
-          currentPeriodId={currentPeriodId}
-          userResetDate={userResetDate}
-          on:periodChange={handlePeriodChangeFromSelector}
-        />
+        {#if userProfile}
+          <PeriodSelector
+            currentPeriodId={currentPeriodId}
+            userResetDate={userResetDate}
+            on:periodChange={handlePeriodChangeFromSelector}
+          />
+        {:else}
+          <div class="period-selector-loading">
+            <div class="loading-skeleton"></div>
+          </div>
+        {/if}
       </div>
     </div>
   </div>
@@ -907,7 +909,18 @@
   <!-- Budget Content Grid -->
   <div class="budget-content-grid">
     {#if isLoading}
-      <LoadingSkeleton />
+      <!-- Unified Skeleton Loading -->
+      <SkeletonHero variant="budget" />
+
+      <SkeletonCard title="Quick Setup">
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          {#each Array(3) as _}
+            <div class="skeleton-button skeleton-shimmer" style="width: 140px; height: 44px; border-radius: 12px; background: rgba(0, 191, 255, 0.1);"></div>
+          {/each}
+        </div>
+      </SkeletonCard>
+
+      <SkeletonList count={8} variant="category" />
     {:else if categories.length === 0}
       <!-- Empty State - Enhanced -->
       <div class="budget-empty-state">
@@ -1200,6 +1213,32 @@
     display: flex;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  /* Period Selector Loading State */
+  .period-selector-loading {
+    width: 100%;
+    max-width: 280px;
+    padding: 10px 14px;
+    background: rgba(6, 182, 212, 0.05);
+    border: 1px solid rgba(6, 182, 212, 0.15);
+    border-radius: 12px;
+  }
+
+  .loading-skeleton {
+    height: 20px;
+    background: linear-gradient(90deg,
+      rgba(6, 182, 212, 0.1) 0%,
+      rgba(6, 182, 212, 0.2) 50%,
+      rgba(6, 182, 212, 0.1) 100%);
+    background-size: 200% 100%;
+    border-radius: 4px;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 
   /* Budget Content Grid - Wrapper for content after header */
@@ -2663,5 +2702,20 @@
   /* Smooth transitions for better UX */
   * {
     transition: all 0.3s ease;
+  }
+
+  /* Skeleton Animation */
+  .skeleton-shimmer {
+    background: linear-gradient(90deg,
+      rgba(0, 191, 255, 0.08) 0%,
+      rgba(0, 191, 255, 0.2) 50%,
+      rgba(0, 191, 255, 0.08) 100%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 </style>

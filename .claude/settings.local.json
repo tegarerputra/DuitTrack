@@ -106,7 +106,10 @@
       "Bash(start http://localhost:3004/dashboard)",
       "Bash(timeout 10 bash -c 'while ! curl -s http://localhost:5173 > /dev/null; do sleep 1; done; echo \"\"Server ready\"\"')",
       "Bash(start http://localhost:3000/dashboard)",
-      "Bash(git reset)"
+      "Bash(git reset)",
+      "Bash(start:*)",
+      "Bash(timeout 15 bash:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

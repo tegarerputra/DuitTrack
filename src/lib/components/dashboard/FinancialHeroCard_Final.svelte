@@ -1,8 +1,8 @@
 <script lang="ts">
   import { formatRupiah } from '$utils/index';
   import { goto } from '$app/navigation';
-  import { getDaysRemainingInPeriod, getTotalDaysInPeriod, formatPeriodDisplay } from '$lib/utils/periodHelpers';
-  import { calculateSpendingVelocity, calculateBudgetStatus } from '$lib/utils/insightCalculators';
+  import { getDaysRemainingInPeriod, getTotalDaysInPeriod } from '$lib/utils/periodHelpers';
+  import { calculateSpendingVelocity } from '$lib/utils/insightCalculators';
 
   // Props with defaults
   export let budgetData: any = null;
@@ -22,66 +22,27 @@
   $: totalDays = currentPeriod ? getTotalDaysInPeriod(currentPeriod) : 30;
   $: daysPassed = totalDays - daysRemaining;
   $: timeProgress = totalDays > 0 ? (daysPassed / totalDays) * 100 : 0;
-  $: periodDisplay = currentPeriod
-    ? formatPeriodDisplay(currentPeriod.startDate, currentPeriod.endDate)
-    : currentPeriodId;
 
   // Velocity calculation
   $: velocity = hasBudget ? calculateSpendingVelocity(totalBudget, totalSpent) : null;
-  $: velocityStatus = velocity ? getVelocityStatus(velocity) : null;
 
-  // Budget status for Month section
-  $: budgetStatus = hasBudget ? calculateBudgetStatus(totalBudget, totalSpent) : null;
+  // Daily Insights calculations
+  $: remainingBudget = Math.max(0, totalBudget - totalSpent);
+  $: dailyAllowance = daysRemaining > 0 ? Math.round(remainingBudget / daysRemaining) : 0;
+  $: dailyAvg = velocity?.dailyBurnRate || 0;
+  $: projected = velocity?.projectedTotal || 0;
+  $: projectedSavings = totalBudget - projected;
+  $: isSaving = projectedSavings > 0;
 
-  // Today's spending
-  $: todaySpending = expenses.filter(e => {
-    try {
-      const expDate = new Date(e.date);
-      const today = new Date();
-      return expDate.toDateString() === today.toDateString();
-    } catch {
-      return false;
-    }
-  }).reduce((sum, e) => sum + (e.amount || 0), 0);
+  // Format end date for display
+  $: endDateFormatted = currentPeriod ? formatEndDate(currentPeriod.endDate) : '';
 
-  $: todayCount = expenses.filter(e => {
-    try {
-      const expDate = new Date(e.date);
-      const today = new Date();
-      return expDate.toDateString() === today.toDateString();
-    } catch {
-      return false;
-    }
-  }).length;
-
-  // Calculate daily spending recommendation - made fully reactive
-  $: dailyRecommendation = (() => {
-    console.log('💡 Calculating daily recommendation:', {
-      hasBudget,
-      daysRemaining,
-      totalBudget,
-      totalSpent,
-      currentPeriod: currentPeriod ? {
-        start: currentPeriod.startDate,
-        end: currentPeriod.endDate
-      } : null
-    });
-
-    if (!hasBudget || daysRemaining <= 0) {
-      console.log('❌ Cannot calculate: hasBudget=', hasBudget, 'daysRemaining=', daysRemaining);
-      return 0;
-    }
-
-    const remainingBudget = totalBudget - totalSpent;
-    if (remainingBudget <= 0) {
-      console.log('❌ No remaining budget:', remainingBudget);
-      return 0;
-    }
-
-    const recommendation = Math.round(remainingBudget / daysRemaining);
-    console.log('✅ Daily recommendation:', recommendation);
-    return recommendation;
-  })();
+  function formatEndDate(date: Date): string {
+    const d = new Date(date);
+    const day = d.getDate();
+    const month = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(d);
+    return `${day} ${month}`;
+  }
 
   function formatShortRupiah(amount: number): string {
     if (amount >= 1000000) {
@@ -92,30 +53,10 @@
     return formatRupiah(amount);
   }
 
-  function formatCompactRupiah(amount: number): string {
-    if (amount >= 1000000) {
-      return `${(amount / 1000000).toFixed(1)}jt`;
-    } else if (amount >= 1000) {
-      return `${Math.round(amount / 1000)}k`;
-    }
-    return `${Math.round(amount)}`;
-  }
-
   function getGradient() {
     if (percentage >= 90) return 'linear-gradient(135deg, rgba(239, 68, 68, 0.55), rgba(220, 38, 38, 0.65))';
     if (percentage >= 75) return 'linear-gradient(135deg, rgba(251, 191, 36, 0.55), rgba(245, 158, 11, 0.65))';
     return 'linear-gradient(135deg, rgba(0, 191, 255, 0.55), rgba(30, 144, 255, 0.65))';
-  }
-
-  function getVelocityStatus(vel: any) {
-    if (vel.status === 'too-fast') {
-      const percentageDiff = (vel.spentProgress - vel.timeProgress) * 100;
-      return { message: `${percentageDiff.toFixed(1)}% TOO FAST`, icon: '🚨', severity: 'danger' };
-    } else if (vel.status === 'slow') {
-      return { message: 'ON TRACK (Hemat!)', icon: '🎉', severity: 'success' };
-    } else {
-      return { message: 'ON TRACK', icon: '✅', severity: 'safe' };
-    }
   }
 </script>
 
@@ -137,7 +78,6 @@
     </div>
 
     <h2 class="title">Total Pengeluaran 💸</h2>
-    <div class="period">{periodDisplay}</div>
     <div class="amount-big">{formatRupiah(totalSpent)}</div>
 
     <div class="cta-box">
@@ -153,98 +93,125 @@
 {:else}
   <!-- Full Mode -->
   <div class="hero-card full-card">
-    <!-- Enhanced Background Elements -->
+    <!-- Enhanced Background Elements with MORE PARTICLES -->
     <div class="hero-bg-elements">
-      <div class="hero-circle hero-circle-1 animate-liquid-float"></div>
-      <div class="hero-circle hero-circle-2 animate-liquid-float"></div>
-      <div class="hero-wave animate-liquid-flow"></div>
+      <div class="hero-circle hero-circle-1"></div>
+      <div class="hero-circle hero-circle-2"></div>
+      <div class="hero-wave"></div>
+
+      <!-- Subtle Glass Particles (6 particles for natural glassmorphism) -->
       <div class="hero-glass-particle hero-particle-1"></div>
       <div class="hero-glass-particle hero-particle-2"></div>
       <div class="hero-glass-particle hero-particle-3"></div>
+      <div class="hero-glass-particle hero-particle-4"></div>
+      <div class="hero-glass-particle hero-particle-5"></div>
+      <div class="hero-glass-particle hero-particle-6"></div>
     </div>
 
     <div class="hero-header">
       <h2 class="title">💰 Financial Pulse</h2>
-      <div class="period">{periodDisplay}</div>
     </div>
 
-    <!-- Metrics Grid -->
-    <div class="metrics">
-      <div class="metric-box">
-        <div class="metric-label">📅 Today</div>
-        <div class="metric-value">{formatRupiah(todaySpending)}</div>
-        <div class="metric-sub">Aim: {formatShortRupiah(dailyRecommendation)}</div>
-      </div>
-
-      <div class="metric-box">
-        <div class="metric-label">📊 Month</div>
-        <div class="metric-value">{formatRupiah(totalSpent)}</div>
-        {#if budgetStatus}
-          <div class="metric-sub">{budgetStatus.icon} {budgetStatus.label}</div>
-        {:else}
-          <div class="metric-sub">{percentage.toFixed(0)}% budget</div>
-        {/if}
-      </div>
-    </div>
-
-    <!-- Spending Velocity Section -->
+    <!-- Spending Velocity Section - REDESIGNED -->
     {#if velocity}
-      <div class="velocity-section">
-        <div class="velocity-header">
-          <span class="velocity-icon">🎯</span>
-          <span class="velocity-title">Spending Velocity</span>
-        </div>
-
-        <!-- Dual Progress Bars -->
-        <div class="progress-compare">
-          <div class="progress-item">
-            <div class="progress-item-header">
-              <span class="progress-label">Time</span>
-              <span class="progress-percent">
-                <span class="days-info">{daysPassed}/{totalDays} days</span>
-                <span class="percent-value">{timeProgress.toFixed(0)}%</span>
-              </span>
-            </div>
-            <div class="progress-track">
-              <div class="progress-fill-time" style="width: {Math.min(100, timeProgress)}%"></div>
-            </div>
-          </div>
-
-          <div class="progress-item">
-            <div class="progress-item-header">
-              <span class="progress-label">Spending</span>
-              <span class="progress-percent">
-                <span class="spending-info">{formatCompactRupiah(totalSpent)}/{formatCompactRupiah(totalBudget)}</span>
-                <span class="percent-value">{(velocity.spentProgress * 100).toFixed(0)}%</span>
-              </span>
-            </div>
-            <div class="progress-track">
-              <div
-                class="progress-fill-spending"
-                class:too-fast={velocity.status === 'too-fast'}
-                class:on-track={velocity.status === 'on-track'}
-                class:slow={velocity.status === 'slow'}
-                style="width: {Math.min(100, velocity.spentProgress * 100)}%"
-              ></div>
-            </div>
+      <div class="velocity-section-new">
+        <div class="velocity-header-new">
+          <span class="velocity-title-new">🎯 Spending Velocity</span>
+          <div class="velocity-status-badge-new" class:on-track={velocity.status === 'on-track'} class:slow={velocity.status === 'slow'} class:too-fast={velocity.status === 'too-fast'}>
+            {#if velocity.status === 'too-fast'}
+              🚨 TOO FAST
+            {:else if velocity.status === 'slow'}
+              ✅ ON TRACK (Hemat!)
+            {:else}
+              ✅ ON TRACK
+            {/if}
           </div>
         </div>
 
-        <!-- Velocity Metrics -->
-        {#if velocity.dailyBurnRate && velocity.dailyTarget}
-          <div class="velocity-metrics">
-            <div class="velocity-metric">
-              <span class="metric-icon">⚡</span>
-              <span class="metric-text">{formatRupiah(velocity.dailyBurnRate)}/day avg (Target: {formatRupiah(velocity.dailyTarget)}/day)</span>
+        <!-- BIG Progress Bar - Prominent -->
+        <div class="big-progress-track">
+          <!-- Time fill (background layer) -->
+          <div class="big-progress-time" style="width: {Math.min(100, timeProgress)}%"></div>
+
+          <!-- Spending fill (foreground layer) -->
+          <div
+            class="big-progress-spending"
+            class:too-fast={velocity.status === 'too-fast'}
+            class:on-track={velocity.status === 'on-track'}
+            class:slow={velocity.status === 'slow'}
+            style="width: {Math.min(100, velocity.spentProgress * 100)}%"
+          ></div>
+
+          <!-- Inline indicators -->
+          <div class="big-progress-indicators">
+            <div class="big-indicator big-indicator-spending">
+              <span class="big-indicator-emoji">💸</span>
+              <span class="big-indicator-value">{(velocity.spentProgress * 100).toFixed(0)}%</span>
             </div>
-            <div class="velocity-metric">
-              <span class="metric-icon">📈</span>
-              <span class="metric-text">Projected: {formatRupiah(velocity.projectedTotal)} ({((velocity.projectedTotal / totalBudget) * 100).toFixed(0)}% of budget)</span>
+            <div class="big-indicator big-indicator-time">
+              <span class="big-indicator-emoji">⏰</span>
+              <span class="big-indicator-value">{timeProgress.toFixed(0)}%</span>
             </div>
           </div>
-        {/if}
+        </div>
+
+        <!-- Clean Legend - No Boxes, Just Text -->
+        <div class="clean-legend">
+          <div class="legend-item">
+            <span class="legend-emoji">💸</span>
+            <span class="legend-text">Spending: <strong>{formatRupiah(totalSpent)}</strong> dari {formatRupiah(totalBudget)}</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-emoji">⏰</span>
+            <span class="legend-text">Time: <strong>{daysPassed} / {totalDays}</strong> days • Ends {endDateFormatted}</span>
+          </div>
+        </div>
+
       </div>
     {/if}
+
+    <!-- Daily Insights Section -->
+    <div class="daily-insights-section">
+      <h3 class="insights-title">
+        <span class="insights-icon">💰</span>
+        Daily Insights
+      </h3>
+
+      <div class="insights-grid">
+        <!-- Daily Average -->
+        <div class="insight-box">
+          <span class="insight-icon">📊</span>
+          <div class="insight-info">
+            <span class="insight-label">Rata-rata:</span>
+            <span class="insight-value">{formatShortRupiah(dailyAvg)}/hari</span>
+          </div>
+        </div>
+
+        <!-- Daily Allowance -->
+        <div class="insight-box">
+          <span class="insight-icon">🎯</span>
+          <div class="insight-info">
+            <span class="insight-label">Sisa budget:</span>
+            <span class="insight-value">{formatShortRupiah(dailyAllowance)}/hari</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Projection (Full Width) -->
+      <div class="insight-box insight-highlight">
+        <span class="insight-icon">{isSaving ? '✨' : '⚠️'}</span>
+        <div class="insight-info">
+          <span class="insight-label">Estimasi akhir bulan:</span>
+          <span class="insight-value" class:saving={isSaving} class:overspend={!isSaving}>
+            {#if isSaving}
+              Hemat {formatRupiah(projectedSavings)}! 🎉
+            {:else}
+              Over {formatRupiah(Math.abs(projectedSavings))} 😰
+            {/if}
+          </span>
+        </div>
+      </div>
+    </div>
   </div>
 {/if}
 
@@ -321,30 +288,52 @@
     bottom: 0;
     pointer-events: none;
     z-index: 1;
+    overflow: hidden;
   }
 
   .hero-circle {
     position: absolute;
     border-radius: 50%;
     background: linear-gradient(135deg,
-      rgba(255, 255, 255, 0.2) 0%,
+      rgba(255, 255, 255, 0.15) 0%,
       rgba(255, 255, 255, 0.05) 100%);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
 
   .hero-circle-1 {
-    width: 140px;
-    height: 140px;
-    top: -70px;
-    right: -70px;
+    width: 180px;
+    height: 180px;
+    top: -90px;
+    right: -90px;
+    animation: circle-float-1 20s ease-in-out infinite;
   }
 
   .hero-circle-2 {
-    width: 100px;
-    height: 100px;
-    bottom: -50px;
-    left: -50px;
+    width: 140px;
+    height: 140px;
+    bottom: -70px;
+    left: -70px;
+    animation: circle-float-2 25s ease-in-out infinite;
+  }
+
+  @keyframes circle-float-1 {
+    0%, 100% {
+      transform: translate(0, 0) scale(1);
+    }
+    50% {
+      transform: translate(-20px, 20px) scale(1.1);
+    }
+  }
+
+  @keyframes circle-float-2 {
+    0%, 100% {
+      transform: translate(0, 0) scale(1);
+    }
+    50% {
+      transform: translate(20px, -20px) scale(1.15);
+    }
   }
 
   .hero-wave {
@@ -352,56 +341,149 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 80px;
+    height: 100px;
     background: linear-gradient(135deg,
-      rgba(255, 255, 255, 0.15) 0%,
+      rgba(255, 255, 255, 0.12) 0%,
       rgba(255, 255, 255, 0.05) 100%);
     border-radius: 50% 50% 0 0;
     backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    animation: wave-motion 15s ease-in-out infinite;
   }
 
+  @keyframes wave-motion {
+    0%, 100% {
+      transform: translateY(0) scaleY(1);
+    }
+    50% {
+      transform: translateY(-10px) scaleY(1.05);
+    }
+  }
+
+  /* Natural Glass Particles - SUBTLE */
   .hero-glass-particle {
     position: absolute;
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     background: radial-gradient(circle,
-      rgba(255, 255, 255, 0.8) 0%,
-      rgba(6, 182, 212, 0.4) 50%,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0.25) 50%,
       transparent 100%);
     border-radius: 50%;
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.2);
     animation: particle-float 8s ease-in-out infinite;
   }
 
   .hero-particle-1 {
-    top: 25%;
-    left: 20%;
+    top: 20%;
+    left: 15%;
     animation-delay: 0s;
   }
 
   .hero-particle-2 {
-    top: 60%;
-    right: 25%;
+    top: 50%;
+    right: 20%;
+    width: 10px;
+    height: 10px;
     animation-delay: -3s;
   }
 
   .hero-particle-3 {
-    bottom: 30%;
-    left: 60%;
+    bottom: 35%;
+    left: 55%;
+    width: 6px;
+    height: 6px;
     animation-delay: -6s;
+  }
+
+  .hero-particle-4 {
+    top: 40%;
+    left: 30%;
+    width: 7px;
+    height: 7px;
+    animation-delay: -1s;
+  }
+
+  .hero-particle-5 {
+    top: 65%;
+    right: 40%;
+    width: 5px;
+    height: 5px;
+    animation-delay: -4s;
+  }
+
+  .hero-particle-6 {
+    top: 30%;
+    right: 35%;
+    width: 9px;
+    height: 9px;
+    animation-delay: -2s;
+  }
+
+  .hero-particle-7 {
+    bottom: 50%;
+    left: 25%;
+    width: 6px;
+    height: 6px;
+    animation-delay: -5s;
+  }
+
+  .hero-particle-8 {
+    bottom: 20%;
+    right: 15%;
+    width: 8px;
+    height: 8px;
+    animation-delay: -7s;
+  }
+
+  .hero-particle-9 {
+    top: 15%;
+    left: 45%;
+    width: 5px;
+    height: 5px;
+    animation-delay: -3.5s;
+  }
+
+  .hero-particle-10 {
+    top: 55%;
+    left: 70%;
+    width: 7px;
+    height: 7px;
+    animation-delay: -4.5s;
+  }
+
+  .hero-particle-11 {
+    bottom: 40%;
+    right: 30%;
+    width: 6px;
+    height: 6px;
+    animation-delay: -2.5s;
+  }
+
+  .hero-particle-12 {
+    top: 75%;
+    left: 40%;
+    width: 8px;
+    height: 8px;
+    animation-delay: -5.5s;
   }
 
   @keyframes particle-float {
     0%, 100% {
-      transform: translateY(0px) scale(1);
-      opacity: 0.6;
+      transform: translate(0, 0) scale(1);
+      opacity: 0.7;
     }
-    33% {
-      transform: translateY(-15px) scale(1.2);
+    25% {
+      transform: translate(10px, -20px) scale(1.3);
       opacity: 1;
     }
-    66% {
-      transform: translateY(10px) scale(0.8);
-      opacity: 0.4;
+    50% {
+      transform: translate(-5px, -30px) scale(0.9);
+      opacity: 0.5;
+    }
+    75% {
+      transform: translate(15px, -10px) scale(1.1);
+      opacity: 0.8;
     }
   }
 
@@ -453,17 +535,6 @@
     background: none;
     -webkit-text-fill-color: white;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-  }
-
-  .period {
-    font-size: 14px;
-    margin-bottom: 24px;
-  }
-
-  .simple-card .period,
-  .full-card .period {
-    color: rgba(255, 255, 255, 0.8);
-    font-weight: 600;
   }
 
   .amount-big {
@@ -564,10 +635,199 @@
   }
 
   .hero-header {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
 
-  .velocity-section {
+  /* ===== NEW VELOCITY SECTION - CONCEPT A ===== */
+  .velocity-section-new {
+    margin-bottom: 24px;
+  }
+
+  .velocity-header-new {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .velocity-title-new {
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+
+  .velocity-status-badge-new {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .velocity-status-badge-new.on-track,
+  .velocity-status-badge-new.slow {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 6px rgba(255, 255, 255, 0.1);
+  }
+
+  .velocity-status-badge-new.too-fast {
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    border: 1px solid rgba(220, 38, 38, 0.4);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    animation: pulse-danger 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-danger {
+    0%, 100% {
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+    }
+    50% {
+      box-shadow: 0 2px 12px rgba(239, 68, 68, 0.35);
+    }
+  }
+
+  /* BIG Progress Bar - FOCAL POINT */
+  .big-progress-track {
+    position: relative;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+
+  /* Time fill (background layer) */
+  .big-progress-time {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.4) 0%,
+      rgba(255, 255, 255, 0.25) 100%);
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 14px 0 0 14px;
+  }
+
+  /* Spending fill (foreground layer) */
+  .big-progress-spending {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+    border-radius: 14px 0 0 14px;
+    z-index: 2;
+    animation: fill-slide 1.2s ease-out;
+  }
+
+  @keyframes fill-slide {
+    0% {
+      width: 0 !important;
+      opacity: 0.6;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  .big-progress-spending.on-track {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+    box-shadow: none;
+  }
+
+  .big-progress-spending.slow {
+    background: linear-gradient(90deg, #22d3ee 0%, #06b6d4 100%);
+    box-shadow: none;
+  }
+
+  .big-progress-spending.too-fast {
+    background: linear-gradient(90deg, #f87171 0%, #ef4444 100%);
+    box-shadow: none;
+  }
+
+  /* Inline indicators */
+  .big-progress-indicators {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .big-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  }
+
+  .big-indicator-emoji {
+    font-size: 20px;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
+  }
+
+  .big-indicator-value {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  /* Clean Legend - No Boxes */
+  .clean-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+  }
+
+  .legend-emoji {
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .legend-text {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.5;
+  }
+
+  .legend-text strong {
+    font-weight: 700;
+    color: white;
+  }
+
+  /* Daily Insights Section */
+  .daily-insights-section {
     padding: 20px;
     background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(15px);
@@ -575,167 +835,86 @@
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.3);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    margin-bottom: 16px;
   }
 
-  .velocity-icon { font-size: 18px; }
-  .velocity-title { font-size: 14px; font-weight: 700; color: white; }
-
-  .progress-compare {
+  .insights-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    margin: 0 0 16px 0;
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .insights-icon {
+    font-size: 16px;
+  }
+
+  .insights-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 12px;
-    margin-bottom: 16px;
-  }
-
-  .progress-item {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .progress-item-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .progress-label {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: rgba(255, 255, 255, 0.7);
-  }
-
-  .progress-percent {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    font-weight: 700;
-    color: white;
-  }
-
-  .days-info {
-    font-size: 11px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.8);
-    background: rgba(255, 255, 255, 0.15);
-    padding: 2px 8px;
-    border-radius: 6px;
-    white-space: nowrap;
-  }
-
-  .spending-info {
-    font-size: 11px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.8);
-    background: rgba(255, 255, 255, 0.15);
-    padding: 2px 8px;
-    border-radius: 6px;
-    white-space: nowrap;
-  }
-
-  .percent-value {
-    font-size: 12px;
-    font-weight: 700;
-    color: white;
-  }
-
-  .progress-track {
-    height: 8px;
-    background: rgba(255, 255, 255, 0.25);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .progress-fill-time {
-    height: 100%;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
-    transition: width 0.8s ease;
-  }
-
-  .progress-fill-spending {
-    height: 100%;
-    transition: width 0.8s ease, background 0.3s ease;
-  }
-
-  .progress-fill-spending.on-track {
-    background: linear-gradient(90deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.8));
-  }
-
-  .progress-fill-spending.slow {
-    background: linear-gradient(90deg, rgba(6, 182, 212, 0.9), rgba(8, 145, 178, 0.8));
-  }
-
-  .progress-fill-spending.too-fast {
-    background: linear-gradient(90deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.8));
-  }
-
-  .velocity-metrics {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .velocity-metric {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.9);
-  }
-
-  .velocity-metric .metric-icon {
-    font-size: 14px;
-  }
-
-  .velocity-metric .metric-text {
-    font-weight: 600;
-    line-height: 1.4;
-  }
-
-  .velocity-box {
-    padding: 20px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(240, 248, 255, 0.5));
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 4px 12px rgba(0, 191, 255, 0.04);
-  }
-
-  .velocity-header {
-    font-size: 14px;
-    font-weight: 700;
-    color: #1f2937;
     margin-bottom: 12px;
   }
 
-  .status {
-    padding: 12px 16px;
+  .insight-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 10px;
-    font-size: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.2s ease;
+  }
+
+  .insight-box:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateX(2px);
+  }
+
+  .insight-highlight {
+    grid-column: 1 / -1;
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .insight-highlight:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .insight-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .insight-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .insight-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .insight-value {
+    font-size: 13px;
     font-weight: 700;
-    text-align: center;
+    color: white;
   }
 
-  .status.safe {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.1));
-    color: #059669;
+  .insight-value.saving {
+    color: #d1fae5;
   }
 
-  .status.warning {
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
-    color: #D97706;
-  }
-
-  .status.danger {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1));
-    color: #DC2626;
+  .insight-value.overspend {
+    color: #fecaca;
   }
 
   /* Mobile Responsive */
@@ -747,11 +926,6 @@
 
     .title {
       font-size: 20px;
-    }
-
-    .period {
-      font-size: 13px;
-      margin-bottom: 20px;
     }
 
     .metrics {
@@ -783,12 +957,84 @@
       margin: 20px 0;
     }
 
-    .velocity-section {
+    .velocity-section-new {
+      margin-bottom: 20px;
+    }
+
+    .velocity-header-new {
+      margin-bottom: 16px;
+      gap: 10px;
+    }
+
+    .velocity-title-new {
+      font-size: 14px;
+    }
+
+    .velocity-status-badge-new {
+      padding: 6px 14px;
+      font-size: 11px;
+    }
+
+    .big-progress-track {
+      height: 56px;
+      margin-bottom: 16px;
+    }
+
+    .big-indicator {
+      font-size: 13px;
+    }
+
+    .big-indicator-emoji {
+      font-size: 18px;
+    }
+
+    .big-indicator-value {
+      font-size: 16px;
+    }
+
+    .clean-legend {
+      gap: 8px;
+    }
+
+    .legend-emoji {
+      font-size: 16px;
+    }
+
+    .legend-text {
+      font-size: 12px;
+    }
+
+    .daily-insights-section {
       padding: 16px;
     }
 
-    .velocity-title {
+    .insights-title {
       font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    .insights-icon {
+      font-size: 15px;
+    }
+
+    .insights-grid {
+      gap: 10px;
+    }
+
+    .insight-box {
+      padding: 10px;
+    }
+
+    .insight-icon {
+      font-size: 16px;
+    }
+
+    .insight-label {
+      font-size: 9px;
+    }
+
+    .insight-value {
+      font-size: 12px;
     }
 
     .hero-circle-1 {
@@ -818,10 +1064,6 @@
 
     .title {
       font-size: 18px;
-    }
-
-    .period {
-      font-size: 12px;
     }
 
     .metrics {

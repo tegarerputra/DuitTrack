@@ -7,6 +7,9 @@
   import AuthErrorDisplay from '$components/auth/AuthErrorDisplay.svelte';
   import SimpleNav from '$components/navigation/SimpleNav.svelte';
   import { Toaster } from 'svelte-french-toast';
+  import NavigationLoader from '$lib/components/ui/NavigationLoader.svelte';
+  import { page } from '$app/stores';
+  import { fade } from 'svelte/transition';
 
   // FIXED: Accept route params to prevent unknown prop warnings
   export let params: Record<string, string> = {};
@@ -123,6 +126,9 @@
 </script>
 
 <main class="min-h-screen fintech-background">
+  <!-- Navigation Loading Indicator -->
+  <NavigationLoader />
+
   <!-- Simple Navigation -->
   <SimpleNav />
 
@@ -134,7 +140,15 @@
 
   <!-- Main Content with top padding for fixed navbar -->
   <div class="pt-16">
-    <slot />
+    {#key $page.url.pathname}
+      <div
+        in:fade={{ duration: 200, delay: 100 }}
+        out:fade={{ duration: 150 }}
+        class="page-transition-wrapper"
+      >
+        <slot />
+      </div>
+    {/key}
   </div>
 </main>
 
@@ -198,5 +212,27 @@
 
   :global(.text-primary-600) {
     color: #B8860B !important;
+  }
+
+  /* Page Transition Wrapper */
+  .page-transition-wrapper {
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  /* Smooth page transitions */
+  :global(.page-transition-wrapper > *) {
+    animation: page-fade-in 0.3s ease-out;
+  }
+
+  @keyframes page-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>

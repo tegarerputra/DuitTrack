@@ -12,6 +12,9 @@
 	import { toastStore } from '$lib/stores/toast';
 	import ToastContainer from '$lib/components/ui/ToastContainer.svelte';
 
+	// Skeleton Components
+	import SkeletonCard from '$lib/components/skeleton/SkeletonCard.svelte';
+
 	// State
 	let currentResetDate = 25;
 	let currentResetType: 'fixed' | 'last-day-of-month' = 'fixed';
@@ -264,10 +267,7 @@
 		</div>
 
 		{#if isLoading}
-			<div class="loading-state">
-				<div class="spinner"></div>
-				<p>Loading settings...</p>
-			</div>
+			<SkeletonCard variant="form" rows={6} />
 		{:else}
 			<!-- Tracking Cycle Section -->
 			<div class="settings-section">

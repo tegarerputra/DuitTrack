@@ -5,6 +5,9 @@
   import { budgetStore } from '$stores/budget';
   import { expenseStore } from '$stores/expenses';
   import { selectedPeriodStore } from '$lib/stores/period';
+  import { expenseService } from '$lib/services/expenseService';
+  import { budgetService } from '$lib/services/budgetService';
+  import { periodService } from '$lib/services/periodService';
   import { goto } from '$app/navigation';
   import { formatRupiah } from '$utils/index';
   import {
@@ -20,8 +23,8 @@
     getPlayfulCategoryMessage,
     timestampToDate
   } from '$lib/utils/formatters';
-  import { SCROLL_CONFIG, BUDGET_THRESHOLDS, UI_CONFIG } from '$lib/config/dashboard.config';
-  import { generatePeriods, formatPeriodDisplay, type PeriodGeneratorConfig } from '$lib/utils/periodHelpers';
+  import { SCROLL_CONFIG, BUDGET_THRESHOLDS } from '$lib/config/dashboard.config';
+  import { getPeriodById } from '$lib/utils/periodHelpers';
   import { fly } from 'svelte/transition';
   import type { User as FirebaseUser } from 'firebase/auth';
   import type { UserProfile } from '$stores/auth';
@@ -41,6 +44,11 @@
   import FintechProgress from '$lib/components/ui/FintechProgress.svelte';
   import FinancialHeroCard from '$lib/components/dashboard/FinancialHeroCard_Final.svelte';
   import PeriodSelector from '$lib/components/dashboard/PeriodSelector.svelte';
+
+  // Skeleton Components
+  import SkeletonHero from '$lib/components/skeleton/SkeletonHero.svelte';
+  import SkeletonCard from '$lib/components/skeleton/SkeletonCard.svelte';
+  import SkeletonList from '$lib/components/skeleton/SkeletonList.svelte';
 
   // Dashboard state
   let error: string | null = null;
@@ -83,7 +91,13 @@
   let scrollThreshold = SCROLL_CONFIG.THRESHOLD;
   let scrollHandlerCleanup: (() => void) | null = null;
 
-  $: if (currentPeriodId) {
+  $: if (currentPeriodId && userProfile) {
+    // Update currentPeriod object from periodId
+    const config = {
+      resetDate: userProfile.budgetResetDate || 25,
+      resetType: 'fixed' as const
+    };
+    currentPeriod = getPeriodById(config, currentPeriodId);
     loadDashboardData();
   }
 
@@ -113,6 +127,9 @@
 
   async function initializeDashboard() {
     try {
+      // Import utility upfront
+      const { validatePeriodResetDate } = await import('$lib/utils/dummyData');
+
       userProfileStore.subscribe((profile) => {
         if (profile) {
           userProfile = profile;
@@ -120,13 +137,11 @@
           // Check budget setup status (will be re-checked after budget data loads)
           hasBudgetSetup = checkBudgetSetup(profile, budgetData);
 
-          // 🔥 FIX: If userProfile has different resetDate, clear stored period to force regeneration
+          // 🔥 FIX: Validate stored period against user's reset date using centralized utility
           const storedPeriod = $selectedPeriodStore;
           if (storedPeriod && profile.budgetResetDate) {
-            // Extract day from stored period (format: YYYY-MM-DD)
-            const storedDay = parseInt(storedPeriod.split('-')[2]);
-            if (storedDay !== profile.budgetResetDate) {
-              console.log(`⚠️ Reset date changed from ${storedDay} to ${profile.budgetResetDate}, clearing period`);
+            if (!validatePeriodResetDate(storedPeriod, profile.budgetResetDate)) {
+              console.log(`⚠️ Reset date changed, clearing period`);
               selectedPeriodStore.clear();
               currentPeriodId = '';
             }
@@ -176,55 +191,48 @@
   }
 
   async function loadDummyData() {
-    // Import centralized dummy data
-    const { getDummyBudgetDataForPeriod, generateDummyExpensesForPeriod } = await import('$lib/utils/dummyData');
+    try {
+      // 🔥 FIREBASE: Load period data from Firestore
+      const periodData = await periodService.loadPeriodData(currentPeriodId);
 
-    // Load expenses for the selected period
-    expenses = generateDummyExpensesForPeriod(currentPeriodId, 25);
+      // Set expenses
+      expenses = periodData.expenses;
 
-    // Calculate REAL total from expenses
-    const realTotalSpent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+      // Set budget data
+      if (periodData.budget) {
+        budgetData = {
+          categories: periodData.budget.categories,
+          totalBudget: periodData.budget.totalBudget,
+          totalSpent: periodData.budget.totalSpent,
+          month: currentPeriodId
+        };
+      } else {
+        // No budget found - empty state
+        budgetData = {
+          categories: {},
+          totalBudget: 0,
+          totalSpent: periodData.totalSpent, // Show spending even without budget
+          month: currentPeriodId
+        };
+      }
 
-    // Calculate spending per category from actual expenses
-    const categorySpending: Record<string, number> = {};
-    expenses.forEach((expense: any) => {
-      const categoryId = expense.category.toUpperCase(); // ✅ Match UPPERCASE category IDs
-      categorySpending[categoryId] = (categorySpending[categoryId] || 0) + expense.amount;
-    });
+      // Re-check budget setup status
+      hasBudgetSetup = checkBudgetSetup(userProfile, budgetData);
 
-    // Load budget data with REAL spent amount per category for this period
-    const budgetDummyData = getDummyBudgetDataForPeriod(currentPeriodId, expenses);
+      calculateBudgetMetrics();
+      calculateExpenseMetrics();
+      loading = false;
 
-    // Update categories with REAL spending from expenses
-    const categoriesWithSpending = Object.fromEntries(
-      Object.entries(budgetDummyData.categories).map(([catId, catData]: [string, any]) => [
-        catId,
-        {
-          budget: catData.budget,
-          spent: categorySpending[catId] || 0  // Use real spending from expenses
-        }
-      ])
-    );
-
-    budgetData = {
-      categories: categoriesWithSpending,
-      totalBudget: budgetDummyData.totalBudget,
-      totalSpent: realTotalSpent, // Use real calculated total
-      month: currentPeriodId
-    };
-
-    // Re-check budget setup status now that budgetData is loaded
-    hasBudgetSetup = checkBudgetSetup(userProfile, budgetData);
-
-    calculateBudgetMetrics();
-    calculateExpenseMetrics();
-    loading = false;
-
-    console.log(`📊 Dummy data loaded for Dashboard - Period: ${currentPeriodId}`);
-    console.log(`🔍 [DASHBOARD] PeriodID: ${currentPeriodId}, ResetDate: ${userProfile?.budgetResetDate || 25}`);
-    console.log('💰 Real total spent:', realTotalSpent);
-    console.log('📊 Category spending:', categorySpending);
-    console.log('✅ Budget setup detected:', hasBudgetSetup);
+      console.log('✅ Dashboard data loaded from Firebase');
+      console.log(`📊 Period: ${currentPeriodId}`);
+      console.log('💰 Total Budget:', budgetData.totalBudget);
+      console.log('📈 Total Spent:', budgetData.totalSpent);
+      console.log('💸 Total Expenses:', expenses.length);
+      console.log('✅ Budget setup detected:', hasBudgetSetup);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      loading = false;
+    }
   }
 
   // Handle period change from PeriodSelector
@@ -286,24 +294,23 @@
   function calculateExpenseMetrics() {
     if (!expenses.length) return;
 
-    // Get recent transactions (last 5) using UI config
-    recentTransactions = expenses
-      .slice()
-      .sort((a, b) => {
-        const dateA = timestampToDate(a.date);
-        const dateB = timestampToDate(b.date);
-        return dateB.getTime() - dateA.getTime();
-      })
-      .slice(0, UI_CONFIG.MAX_RECENT_TRANSACTIONS) as Transaction[];
-
-    // Calculate today's spending
+    // Get TODAY's transactions only
     const today = new Date();
-    const todaySpending = expenses
+    const todayTransactions = expenses
       .filter(expense => {
         const expenseDate = timestampToDate(expense.date);
         return expenseDate.toDateString() === today.toDateString();
       })
-      .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+      .sort((a, b) => {
+        const dateA = timestampToDate(a.date);
+        const dateB = timestampToDate(b.date);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+    recentTransactions = todayTransactions as Transaction[];
+
+    // Calculate today's spending from today's transactions
+    const todaySpending = todayTransactions.reduce((sum, expense) => sum + (expense.amount || 0), 0);
 
     // Update metrics
     metrics = { ...metrics, todaySpending };
@@ -400,11 +407,17 @@
 
             <!-- Period Selector -->
             <div class="header-actions">
-              <PeriodSelector
-                currentPeriodId={currentPeriodId}
-                userResetDate={userProfile?.budgetResetDate || 25}
-                on:periodChange={handlePeriodChange}
-              />
+              {#if userProfile}
+                <PeriodSelector
+                  currentPeriodId={currentPeriodId}
+                  userResetDate={userProfile.budgetResetDate || 25}
+                  on:periodChange={handlePeriodChange}
+                />
+              {:else}
+                <div class="period-selector-loading">
+                  <div class="loading-skeleton"></div>
+                </div>
+              {/if}
             </div>
           </div>
         </div>
@@ -412,50 +425,53 @@
         <!-- Main Dashboard Grid -->
         <div class="dashboard-grid">
 
-          <!-- NEW FINANCIAL HERO CARD -->
-          <div class="hero-card-container">
-            <FinancialHeroCard
-              {budgetData}
-              {expenses}
-              {currentPeriodId}
-              {currentPeriod}
-              {loading}
-            />
-          </div>
-
-
-
-
-          <!-- Recent Transactions -->
-          <div class="transactions-card liquid-card">
-            <div class="glass-card-overlay"></div>
-            <div class="transactions-header">
-              <h3 class="transactions-title">
-                <span class="transactions-icon">🕐</span>
-                Transaksi Terbaru
-              </h3>
-              <span class="transactions-count">({recentTransactions.length})</span>
+          {#if loading}
+            <!-- Unified Skeleton Loading -->
+            <div class="hero-card-container">
+              <SkeletonHero variant="dashboard" />
             </div>
 
-            {#if loading}
-              <!-- Loading skeleton -->
-              <div class="transactions-loading">
-                {#each Array(3) as _}
-                  <div class="transaction-loading-item">
-                    <div class="loading-avatar"></div>
-                    <div class="loading-content">
-                      <div class="loading-title"></div>
-                      <div class="loading-subtitle"></div>
-                    </div>
-                    <div class="loading-amount"></div>
-                  </div>
-                {/each}
+            <SkeletonCard title="Transaksi Hari Ini">
+              <SkeletonList count={3} variant="transaction" />
+            </SkeletonCard>
+
+            <SkeletonCard title="Kategori Need Attention">
+              <SkeletonList count={2} variant="category" />
+            </SkeletonCard>
+          {:else}
+            <!-- NEW FINANCIAL HERO CARD -->
+            <div class="hero-card-container">
+              <FinancialHeroCard
+                {budgetData}
+                {expenses}
+                {currentPeriodId}
+                {currentPeriod}
+                {loading}
+              />
+            </div>
+
+            <!-- Today's Transactions -->
+            <div class="transactions-card liquid-card">
+              <div class="glass-card-overlay"></div>
+              <div class="transactions-header">
+                <h3 class="transactions-title">
+                  <span class="transactions-icon">📅</span>
+                  Transaksi Hari Ini
+                </h3>
               </div>
-            {:else if recentTransactions.length === 0}
+
+              <!-- Total Today Spending - Highlighted Box -->
+              <div class="today-total-box">
+                <div class="today-total-label">Total:</div>
+                <div class="today-total-value">{formatRupiah(metrics.todaySpending)}</div>
+                <div class="today-total-count">({recentTransactions.length} transaksi)</div>
+              </div>
+
+              {#if recentTransactions.length === 0}
               <div class="empty-transactions">
-                <div class="empty-icon">📝</div>
-                <p class="empty-title">Belum ada transaksi nih</p>
-                <p class="empty-subtitle">Yuk mulai catat pengeluaran! 💪</p>
+                <div class="empty-icon">🎉</div>
+                <p class="empty-title">Belum ada pengeluaran hari ini!</p>
+                <p class="empty-subtitle">Saatnya mulai hari dengan tracking! 🚀</p>
               </div>
             {:else}
               <div class="transactions-list">
@@ -487,38 +503,41 @@
                 </button>
               </div>
             {/if}
-          </div>
+            </div>
 
-          <!-- Categories Need Attention -->
-          <FintechCard
-            variant={categoriesNeedAttention.length > 0 ? "warning" : "success"}
-            size="md"
-            interactive={false}
-            className="fintech-fade-in dashboard-category-card"
-          >
-            <h3 class="text-lg font-semibold fintech-text-primary mb-4">
-              {categoriesNeedAttention.length > 0 ? '⚠️ Ada yang perlu diperhatikan nih!' : '🎉 Semua budget terkendali!'}
-            </h3>
+            <!-- Categories Need Attention -->
+            <FintechCard
+              variant={categoriesNeedAttention.length > 0 ? "warning" : (hasBudgetSetup ? "success" : "info")}
+              size="md"
+              interactive={false}
+              className="fintech-fade-in dashboard-category-card"
+            >
+              <h3 class="text-lg font-semibold fintech-text-primary mb-4">
+                {#if categoriesNeedAttention.length > 0}
+                  ⚠️ Ada yang perlu diperhatikan nih!
+                {:else if !hasBudgetSetup}
+                  💡 Yuk, Mulai Setup Budget!
+                {:else}
+                  🎉 Semua budget terkendali!
+                {/if}
+              </h3>
 
-            {#if loading}
-              <!-- Loading skeleton -->
-              <div class="space-y-2">
-                {#each Array(2) as _}
-                  <div class="animate-pulse flex items-center justify-between p-3">
-                    <div class="flex items-center gap-3">
-                      <div class="w-6 h-6 bg-gray-200 rounded"></div>
-                      <div class="h-4 bg-gray-200 rounded w-20"></div>
-                    </div>
-                    <div class="h-4 bg-gray-200 rounded w-12"></div>
+              {#if categoriesNeedAttention.length === 0}
+                {#if !hasBudgetSetup}
+                  <!-- Empty state when budget is not set up -->
+                  <div class="text-center py-6">
+                    <div class="text-4xl mb-2">💡</div>
+                    <p class="text-sm fintech-text-secondary">Belum ada kategori budget yang disetup</p>
+                    <p class="text-xs fintech-text-tertiary mt-1">Mulai atur budget untuk tracking pengeluaran yang lebih baik</p>
                   </div>
-                {/each}
-              </div>
-            {:else if categoriesNeedAttention.length === 0}
-              <div class="text-center py-6">
-                <div class="text-4xl mb-2">🎉</div>
-                <p class="text-sm fintech-text-secondary">Semua budget terkendali!</p>
-                <p class="text-xs fintech-text-tertiary mt-1">Keren banget nih! 👏</p>
-              </div>
+                {:else}
+                  <!-- Success state when all budgets are under control -->
+                  <div class="text-center py-6">
+                    <div class="text-4xl mb-2">🎉</div>
+                    <p class="text-sm fintech-text-secondary">Semua budget terkendali!</p>
+                    <p class="text-xs fintech-text-tertiary mt-1">Keren banget nih! 👏</p>
+                  </div>
+                {/if}
             {:else}
               <div class="space-y-2">
                 {#each categoriesNeedAttention as category, index}
@@ -552,7 +571,8 @@
                 </FintechButton>
               </div>
             {/if}
-          </FintechCard>
+            </FintechCard>
+          {/if}
 
         </div>
 
@@ -903,6 +923,42 @@
     font-weight: 500;
   }
 
+  /* Today Total Box - Highlighted */
+  .today-total-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(6, 182, 212, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: 1px solid rgba(6, 182, 212, 0.2);
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(6, 182, 212, 0.05);
+  }
+
+  .today-total-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  .today-total-value {
+    flex: 1;
+    font-size: 20px;
+    font-weight: 800;
+    color: #0891B2;
+    text-align: right;
+  }
+
+  .today-total-count {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+    white-space: nowrap;
+  }
+
   /* Empty State */
   .empty-transactions {
     text-align: center;
@@ -1000,24 +1056,30 @@
   }
 
   /* Loading States */
-  .hero-loading {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    height: 200px;
-    justify-content: center;
+  .period-selector-loading {
+    width: 100%;
+    max-width: 280px;
+    padding: 10px 14px;
+    background: rgba(6, 182, 212, 0.05);
+    border: 1px solid rgba(6, 182, 212, 0.15);
+    border-radius: 12px;
   }
 
-  .loading-bar {
-    height: 16px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    animation: pulse 1.5s ease-in-out infinite;
+  .loading-skeleton {
+    height: 20px;
+    background: linear-gradient(90deg,
+      rgba(6, 182, 212, 0.1) 0%,
+      rgba(6, 182, 212, 0.2) 50%,
+      rgba(6, 182, 212, 0.1) 100%);
+    background-size: 200% 100%;
+    border-radius: 4px;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
   }
 
-  .loading-1 { width: 60%; animation-delay: 0s; }
-  .loading-2 { width: 80%; animation-delay: 0.2s; }
-  .loading-3 { width: 40%; animation-delay: 0.4s; }
+  @keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
 
   /* Animations */
   @keyframes float {
@@ -1044,28 +1106,6 @@
 
   /* Mobile Responsive */
   @media (max-width: 430px) {
-    .hero-budget-card {
-      padding: 24px;
-      min-height: 280px;
-    }
-
-    .hero-title {
-      font-size: 20px;
-    }
-
-    .main-amount {
-      font-size: 36px;
-    }
-
-    .colorful-stats-grid {
-      gap: 12px;
-    }
-
-    .colorful-stat-card {
-      padding: 20px;
-      min-height: 120px;
-    }
-
     /* Mobile sticky button adjustments */
     .sticky-bottom-button {
       bottom: 16px;
@@ -1319,84 +1359,5 @@
     }
   }
 
-  /* ============================================
-     BUDGET SETUP CTA CARD
-     ============================================ */
-
-  .budget-cta-card {
-    padding: 20px;
-    margin: 16px 20px 20px;
-    background: linear-gradient(135deg,
-      rgba(245, 158, 11, 0.1) 0%,
-      rgba(249, 115, 22, 0.08) 100%);
-    border: 2px solid rgba(245, 158, 11, 0.3);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
-    transition: all 0.3s ease;
-  }
-
-  .budget-cta-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.2);
-  }
-
-  .cta-icon {
-    font-size: 40px;
-    flex-shrink: 0;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-  }
-
-  .cta-content {
-    flex: 1;
-  }
-
-  .cta-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #1f2937;
-    margin-bottom: 4px;
-  }
-
-  .cta-description {
-    font-size: 13px;
-    color: #6b7280;
-    line-height: 1.4;
-  }
-
-  .cta-button {
-    padding: 10px 20px;
-    background: linear-gradient(135deg, #f59e0b, #f97316);
-    color: white;
-    font-weight: 700;
-    font-size: 14px;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-    transition: all 0.3s ease;
-    white-space: nowrap;
-    flex-shrink: 0;
-    border: none;
-    cursor: pointer;
-  }
-
-  .cta-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
-  }
-
-  /* Mobile responsive for CTA card */
-  @media (max-width: 640px) {
-    .budget-cta-card {
-      flex-direction: column;
-      text-align: center;
-      padding: 24px 16px;
-      margin: 16px 12px 20px;
-    }
-
-    .cta-button {
-      width: 100%;
-    }
-  }
+  /* Removed unused BUDGET SETUP CTA CARD CSS - not used in current dashboard layout */
 </style>

@@ -6,6 +6,9 @@
   import { expenseActions } from '../../lib/stores/expenses';
   import { budgetStore, budgetActions } from '../../lib/stores/budget';
   import { authService } from '../../lib/services/authService';
+  import { expenseService } from '../../lib/services/expenseService';
+  import { budgetService } from '../../lib/services/budgetService';
+  import { periodService } from '../../lib/services/periodService';
   import { DataService } from '../../lib/services/dataService';
   import SmartWarning from '../../lib/components/expense/SmartWarning.svelte';
 
@@ -155,8 +158,29 @@
   async function loadBudgetAndCategories() {
     try {
       isLoadingCategories = true;
-      // Load budget data - reactive statement will handle updating categories
-      await budgetActions.loadBudgetData();
+
+      // 🔥 FIREBASE: Load budget from Firestore
+      const currentPeriodId = await periodService.getCurrentPeriodId();
+      const budget = await budgetService.getBudgetByPeriod(currentPeriodId);
+
+      if (budget) {
+        // Set budget store with Firebase data
+        budgetStore.set({
+          categories: budget.categories,
+          totalBudget: budget.totalBudget,
+          totalSpent: budget.totalSpent
+        });
+        console.log('✅ Budget loaded from Firebase:', budget);
+      } else {
+        // No budget found - set empty
+        budgetStore.set({
+          categories: {},
+          totalBudget: 0,
+          totalSpent: 0
+        });
+        console.log('ℹ️ No budget found for period, showing empty state');
+      }
+
       // Reactive statement will set isLoadingCategories to false
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -388,34 +412,31 @@
         return;
       }
 
-      const transactionData = {
+      // Get current period ID
+      const currentPeriodId = await periodService.getCurrentPeriodId();
+
+      // 🔥 FIREBASE: Create expense in Firestore
+      const expenseData = {
         amount,
         category: data.category.toUpperCase(),
         description: data.description,
-        date: data.date,
-        type: 'expense' as const,
-        userId: user.uid
+        date: new Date(data.date),
+        periodId: currentPeriodId
       };
 
-      let expenseId: string;
-      // Create new expense
-      if (dataService) {
-        expenseId = await dataService.createTransaction(transactionData);
-      } else {
-        expenseId = generateTempId();
-      }
+      const expenseId = await expenseService.addExpense(expenseData);
 
-      // Prepare expense data with additional fields for store
-      const expenseData = {
-        ...transactionData,
+      // 🔥 FIREBASE: Sync budget spending
+      await periodService.syncBudgetWithExpenses(currentPeriodId);
+
+      // Update local stores for immediate UI update
+      await expenseActions.addExpense({
+        ...expenseData,
         id: expenseId,
-        periodId: getCurrentPeriodId(),
-        categoryId: data.category.toLowerCase()
-      };
+        userId: user.uid
+      } as any);
 
-      // Update stores
-      await expenseActions.addExpense(expenseData as any);
-      await budgetActions.updateCategorySpending(data.category.toLowerCase(), amount);
+      console.log('✅ Expense saved to Firebase:', expenseId);
 
       // Show success and redirect
       showSuccessState = true;
