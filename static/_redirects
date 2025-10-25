@@ -1,8 +1,0 @@
-# Netlify Redirects for DuitTrack SPA
-# Format: from to [status]
-
-# API redirects to Netlify Functions
-/api/*  /.netlify/functions/:splat  200
-
-# SPA fallback - serve index.html for all routes (must be last)
-/*  /index.html  200
