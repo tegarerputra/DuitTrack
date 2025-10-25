@@ -1,14 +1,38 @@
-<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-        <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
-      </linearGradient>
-    </defs>
-    <rect width="100%" height="100%" rx="4.8" ry="4.8" fill="url(#grad)"/>
-    <text x="50%" y="40%" font-family="Arial,sans-serif" font-size="9.6" font-weight="bold"
-          text-anchor="middle" fill="white">D</text>
-    <circle cx="50%" cy="70%" r="3.84" fill="#f093fb"/>
-    <text x="50%" y="74%" font-family="Arial,sans-serif" font-size="3.2" font-weight="bold"
-          text-anchor="middle" fill="white">Rp</text>
-  </svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="grad-32" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow-32">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background with gradient -->
+  <rect width="32" height="32" fill="url(#grad-32)" rx="4.8"/>
+
+  <!-- Emoji/Icon -->
+  <text
+    x="50%"
+    y="50%"
+    font-size="20.8"
+    text-anchor="middle"
+    dominant-baseline="central"
+    fill="white"
+    font-family="'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif"
+    filter="url(#shadow-32)"
+  >💰</text>
+
+  <!-- Subtle shine effect -->
+  <circle cx="9.6" cy="9.6" r="4.8" fill="white" opacity="0.2"/>
+</svg>

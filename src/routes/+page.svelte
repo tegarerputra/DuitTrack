@@ -6,9 +6,6 @@
   import AuthGuard from '$components/auth/AuthGuard.svelte';
   import GoogleSignInButton from '$components/auth/GoogleSignInButton.svelte';
 
-  // FIXED: Accept route params to prevent unknown prop warnings
-  export let params: Record<string, string> = {};
-
   let loading = true;
   let heroVisible = false;
 

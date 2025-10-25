@@ -508,7 +508,6 @@
 
       // 🔥 FIREBASE: Update category budget in Firestore
       await budgetService.updateCategoryBudget(currentPeriodId, categoryId, newBudget);
-      }
 
       console.log(`✅ Budget updated for ${categoryId}: ${formatCurrency(newBudget)}`);
     } catch (error) {
@@ -571,17 +570,7 @@
       // 🔥 FIREBASE: Add category to budget in Firestore
       await budgetService.addCategory(currentPeriodId, categoryData.id, categoryData.budget);
 
-        // Then, add the budget to the current period
-        await dataService.addCategoryBudgetToPeriod(
-          currentPeriodId,
-          categoryData.id,
-          categoryData.budget
-        );
-
-        console.log(`✅ Category added and saved to database: ${categoryData.name}`);
-      } else {
-        console.log(`✅ Category added locally: ${categoryData.name}`);
-      }
+      console.log(`✅ Category added and saved to database: ${categoryData.name}`);
     } catch (error) {
       console.error('❌ Error adding category:', error);
       // Rollback local state on error

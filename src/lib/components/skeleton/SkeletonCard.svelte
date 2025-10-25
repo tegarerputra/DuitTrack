@@ -12,30 +12,34 @@
   {/if}
 
   <div class="skeleton-card-content">
-    {#if variant === 'filters'}
-      <!-- Search Bar -->
-      <div class="skeleton-search skeleton-shimmer"></div>
+    <!-- Slot for custom content -->
+    <slot>
+      <!-- Default skeleton content if no slot provided -->
+      {#if variant === 'filters'}
+        <!-- Search Bar -->
+        <div class="skeleton-search skeleton-shimmer"></div>
 
-      <!-- Category Chips -->
-      <div class="skeleton-chips">
-        {#each Array(6) as _}
-          <div class="skeleton-chip skeleton-shimmer"></div>
-        {/each}
-      </div>
-    {:else if variant === 'form'}
-      <!-- Form Fields -->
-      {#each Array(rows) as _}
-        <div class="skeleton-form-group">
-          <div class="skeleton-form-label skeleton-shimmer"></div>
-          <div class="skeleton-form-input skeleton-shimmer"></div>
+        <!-- Category Chips -->
+        <div class="skeleton-chips">
+          {#each Array(6) as _}
+            <div class="skeleton-chip skeleton-shimmer"></div>
+          {/each}
         </div>
-      {/each}
-    {:else}
-      <!-- Generic Rows -->
-      {#each Array(rows) as _, i}
-        <div class="skeleton-row skeleton-shimmer" class:short={i % 3 === 0}></div>
-      {/each}
-    {/if}
+      {:else if variant === 'form'}
+        <!-- Form Fields -->
+        {#each Array(rows) as _}
+          <div class="skeleton-form-group">
+            <div class="skeleton-form-label skeleton-shimmer"></div>
+            <div class="skeleton-form-input skeleton-shimmer"></div>
+          </div>
+        {/each}
+      {:else}
+        <!-- Generic Rows -->
+        {#each Array(rows) as _, i}
+          <div class="skeleton-row skeleton-shimmer" class:short={i % 3 === 0}></div>
+        {/each}
+      {/if}
+    </slot>
   </div>
 </div>
 
