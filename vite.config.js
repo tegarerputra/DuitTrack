@@ -219,17 +219,6 @@ export default defineConfig({
     force: true
   },
 
-  // Performance optimizations for Indonesian users
-  experimental: {
-    renderBuiltUrl(filename, { hostType }) {
-      if (hostType === 'js') {
-        return { runtime: `window.__toCdnUrl(${JSON.stringify(filename)})` };
-      } else {
-        return { relative: true };
-      }
-    }
-  },
-
   // Worker optimizations for PWA
   worker: {
     format: 'es',
