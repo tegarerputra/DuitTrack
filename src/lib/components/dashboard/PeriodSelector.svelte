@@ -73,7 +73,8 @@
     isOpen = false;
   }
 
-  // On mount, ensure we have a default period (current period)
+  // 🔥 FIX: Auto-switch to current period when page loads
+  // This ensures period tracking automatically resets when reset date arrives
   onMount(() => {
     // Get current period from localStorage
     const storedPeriod = $selectedPeriodStore;
@@ -82,16 +83,31 @@
     const availablePeriods = generateAvailablePeriods();
     const currentPeriod = availablePeriods.find(p => p.isCurrent);
 
-    // If no stored period or stored period is invalid, default to current period
-    const isStoredPeriodValid = storedPeriod && availablePeriods.find(p => p.id === storedPeriod);
+    // Always default to current period on mount (unless explicitly changed by user during session)
+    // This ensures period automatically updates when:
+    // 1. User opens app on a new day that crosses reset date
+    // 2. Reset date has changed in settings
+    // 3. No period is stored
+    if (!storedPeriod || storedPeriod !== currentPeriod?.id) {
+      if (!storedPeriod) {
+        console.log('📅 PeriodSelector: No stored period, defaulting to current:', currentPeriod?.id);
+      } else {
+        // Check if stored period is still valid
+        const isStoredPeriodValid = availablePeriods.find(p => p.id === storedPeriod);
 
-    if (!isStoredPeriodValid) {
-      const defaultPeriod = currentPeriod?.id || availablePeriods[0]?.id || '';
-      console.log('📅 PeriodSelector: Setting default to current period:', defaultPeriod);
-      selectedPeriodStore.set(defaultPeriod);
-      dispatch('periodChange', { periodId: defaultPeriod });
+        if (!isStoredPeriodValid) {
+          console.log('⚠️ PeriodSelector: Stored period no longer valid (reset date changed?), switching to current:', storedPeriod, '→', currentPeriod?.id);
+        } else {
+          console.log('🔄 PeriodSelector: New period available! Auto-switching from', storedPeriod, 'to current period:', currentPeriod?.id);
+        }
+      }
+
+      if (currentPeriod) {
+        selectedPeriodStore.set(currentPeriod.id);
+        dispatch('periodChange', { periodId: currentPeriod.id });
+      }
     } else {
-      console.log('📅 PeriodSelector: Using stored period:', storedPeriod);
+      console.log('✅ PeriodSelector: Current period already selected:', storedPeriod);
     }
   });
 
