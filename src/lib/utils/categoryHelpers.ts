@@ -5,6 +5,7 @@
  * Get category icon emoji
  */
 export function getCategoryIcon(category: string): string {
+  if (!category) return '📦'; // Default icon for undefined/null
   const normalizedCategory = category.toUpperCase();
   const icons: Record<string, string> = {
     'FOOD': '🍽️',
@@ -24,6 +25,7 @@ export function getCategoryIcon(category: string): string {
  * Format category name to Indonesian
  */
 export function formatCategoryName(category: string): string {
+  if (!category) return 'Lainnya'; // Default name for undefined/null
   const normalizedCategory = category.toUpperCase();
   const names: Record<string, string> = {
     'FOOD': 'Makanan',

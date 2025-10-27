@@ -19,25 +19,27 @@
 
   const dispatch = createEventDispatcher();
 
-  // Internal state management
+  // Internal state management - MUST be declared before any subscriptions
   let currentPeriodId = '';
   let userResetDate = 25; // ✅ FIXED: Match default with Dashboard/Expenses (was hardcoded to 1)
+  let isPeriodInitialized = false;
+  let userProfile: any = null;
+  let categories: any[] = [];
+  let isLoading = true; // ✅ Start with true for instant skeleton
+  let dataService: DataService | null = null;
 
   // Subscribe to shared period store for cross-page persistence
   selectedPeriodStore.subscribe((value) => {
     if (value && value !== currentPeriodId) {
       currentPeriodId = value;
+      isPeriodInitialized = true;
       console.log('📅 Budget: Period changed from store:', value);
-      // Reload dummy data when period changes from another page
+      // Reload budget data when period changes from another page
       if (currentPeriodId) {
-        loadDummyData();
+        loadBudgetDataFromFirebase();
       }
     }
   });
-  let userProfile: any = null;
-  let categories: any[] = [];
-  let isLoading = true; // ✅ Start with true for instant skeleton
-  let dataService: DataService | null = null;
   let showAddCategoryForm = false;
   let newCategoryData = {
     id: '',
@@ -293,11 +295,7 @@
     categoryFormErrors.name = '';
   }
 
-  // Reactive icon display - using same icon that rotates with CSS
-  $: buttonIcon = '+';
-  $: console.log('Icon rotation state, showAddCategoryForm:', showAddCategoryForm);
-
-  // Reactive stores
+  // Reactive stores - MUST be declared before reactive statements
   const budgetData = writable(null);
   const selectedPeriod = writable('');
   const availablePeriods = writable([]);
@@ -326,6 +324,10 @@
     return { status, percentage: Math.round(percentage) };
   });
 
+  // Reactive icon display - using same icon that rotates with CSS
+  $: buttonIcon = '+';
+  $: console.log('Icon rotation state, showAddCategoryForm:', showAddCategoryForm);
+
   // Component initialization
   onMount(async () => {
     // Setup period selector first to ensure currentPeriodId is set
@@ -334,11 +336,12 @@
     // Then initialize the rest
     await initializeBudgetComponent();
 
-    // TEMPORARY: Load dummy data for development (currentPeriodId should be set by now)
+    // Load budget data from Firebase (currentPeriodId should be set by now)
     if (currentPeriodId) {
-      loadDummyData();
+      await loadBudgetDataFromFirebase();
     } else {
-      console.error('❌ currentPeriodId not set, cannot load dummy data');
+      console.error('❌ currentPeriodId not set, cannot load budget data');
+      isLoading = false;
     }
   });
 
@@ -350,13 +353,21 @@
       const periods = generatePeriodOptions(resetDate, 12);
       availablePeriods.set(periods);
 
-      // DON'T set period here - let PeriodSelector handle it
-      // Just read from store if available
+      // Check if we have a stored period from the store
       const storedPeriod = $selectedPeriodStore;
       if (storedPeriod) {
         currentPeriodId = storedPeriod;
+        isPeriodInitialized = true;
         selectedPeriod.set(currentPeriodId);
         console.log('✅ Budget: Using stored period from store:', currentPeriodId);
+      } else if (periods.length > 0) {
+        // If no stored period, initialize with current period (first in list)
+        const currentPeriod = periods[0];
+        currentPeriodId = currentPeriod.id;
+        isPeriodInitialized = true;
+        selectedPeriod.set(currentPeriodId);
+        selectedPeriodStore.set(currentPeriodId);
+        console.log('✅ Budget: Initialized with current period:', currentPeriodId);
       } else {
         console.log('📅 Budget: Waiting for PeriodSelector to set period');
       }
@@ -371,6 +382,7 @@
       const user = await authService.getCurrentUser();
       if (!user) {
         console.warn('No authenticated user found');
+        isLoading = false;
         return;
       }
 
@@ -380,10 +392,11 @@
       // Load user settings
       await loadUserSettings();
 
-      // Load budget data for current period
-      await loadBudgetData();
+      // Budget data will be loaded in onMount after this
+      console.log('✅ Budget component initialized');
     } catch (error) {
       console.error('Error initializing budget component:', error);
+      isLoading = false;
     }
   }
 
@@ -425,65 +438,13 @@
     const newPeriodId = event.detail.periodId;
     console.log(`🔄 Budget switching to period: ${newPeriodId}`);
     currentPeriodId = newPeriodId;
+    isPeriodInitialized = true;
     selectedPeriod.set(currentPeriodId);
     selectedPeriodStore.set(currentPeriodId); // Save to shared store for cross-page persistence
 
-    // TEMPORARY: Load dummy data for the new period (same as Dashboard)
-    loadDummyData();
-
-    // DISABLED: Real data loading (will be re-enabled in production)
-    // loadBudgetData();
+    // Load budget data from Firebase for the new period
+    loadBudgetDataFromFirebase();
   }
-
-
-  async function loadBudgetData() {
-    if (!dataService || !currentPeriodId) return;
-
-    try {
-      isLoading = true;
-
-      // ✅ INSTANT LOADING - No artificial delay for better UX
-      // Load budget data using the new DataService
-      const periods = await dataService.getPeriods();
-      const currentPeriod = periods.find(p => p.id === currentPeriodId);
-
-      if (currentPeriod) {
-        // Extract categories from period summary
-        const budgetCategories = currentPeriod.summary?.categoryBreakdown || {};
-
-        // Convert to the expected format
-        const formattedCategories = Object.entries(budgetCategories).map(([categoryId, data]: [string, any]) => ({
-          id: categoryId,
-          name: formatCategoryName(categoryId),
-          emoji: getCategoryEmoji(categoryId),
-          budget: data.budget || 0,
-          spent: data.spent || 0
-        }));
-
-        categories = formattedCategories;
-        budgetData.set({
-          categories: Object.fromEntries(
-            formattedCategories.map(cat => [cat.id, { budget: cat.budget, spent: cat.spent }])
-          ),
-          totalBudget: formattedCategories.reduce((sum, cat) => sum + cat.budget, 0),
-          totalSpent: formattedCategories.reduce((sum, cat) => sum + cat.spent, 0)
-        });
-      } else {
-        // No budget data found
-        categories = [];
-        budgetData.set(null);
-      }
-
-    } catch (error) {
-      console.error('❌ Error loading budget data:', error);
-      categories = [];
-      budgetData.set(null);
-    } finally {
-      isLoading = false;
-    }
-  }
-
-
   async function handleCategoryBudgetUpdate(categoryId: string, newBudget: number) {
     try {
       // Update local state immediately for responsiveness
@@ -567,8 +528,8 @@
         };
       });
 
-      // 🔥 FIREBASE: Add category to budget in Firestore
-      await budgetService.addCategory(currentPeriodId, categoryData.id, categoryData.budget);
+      // 🔥 FIREBASE: Add category to budget in Firestore with name and emoji
+      await budgetService.addCategory(currentPeriodId, categoryData.id, categoryData.budget, categoryData.name, categoryData.emoji);
 
       console.log(`✅ Category added and saved to database: ${categoryData.name}`);
     } catch (error) {
@@ -663,6 +624,13 @@
   }
 
   async function handleSaveNewCategory() {
+    // Check if period is initialized first
+    if (!currentPeriodId || !isPeriodInitialized) {
+      toastStore.error('Silakan pilih periode terlebih dahulu');
+      console.error('❌ Cannot add category: currentPeriodId not set', { currentPeriodId, isPeriodInitialized });
+      return;
+    }
+
     // Validate form
     if (!validateCategoryForm()) {
       toastStore.error('Mohon periksa kembali form input');
@@ -673,6 +641,8 @@
 
     try {
       const categoryId = newCategoryData.id || newCategoryData.name.toLowerCase().trim().replace(/\s+/g, '_');
+
+      console.log('💾 Saving category with period:', currentPeriodId);
 
       await handleAddCategory({
         id: categoryId,
@@ -817,54 +787,61 @@
     return Math.max(0, diffDays);
   }
 
-  async function loadDummyData() {
-  try {
-    // Set loading to true at the start
-    isLoading = true;
+  async function loadBudgetDataFromFirebase() {
+    try {
+      // Set loading to true at the start
+      isLoading = true;
+      console.log('🔄 Loading budget data from Firebase for period:', currentPeriodId);
 
-    // 🔥 FIREBASE: Load budget from Firestore
-    const budget = await budgetService.getBudgetByPeriod(currentPeriodId);
+      // 🔥 FIREBASE: Load budget from Firestore
+      const budget = await budgetService.getBudgetByPeriod(currentPeriodId);
 
-    if (budget && budget.categories) {
-      // Budget exists - convert to categories array
-      categories = Object.entries(budget.categories).map(([id, data]: [string, any]) => {
-        const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === id);
-        return {
-          id,
-          name: defaultCat?.name || id,
-          emoji: defaultCat?.emoji || '💰',
-          budget: data.budget,
-          spent: data.spent,
-          remaining: data.budget - data.spent,
-          percentage: data.budget > 0 ? (data.spent / data.budget) * 100 : 0
-        };
-      });
+      if (budget && budget.categories) {
+        // Budget exists - convert to categories array
+        categories = Object.entries(budget.categories).map(([id, data]: [string, any]) => {
+          const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === id);
+          return {
+            id,
+            // Use saved name/emoji if available, otherwise fallback to default
+            name: data.name || defaultCat?.name || id,
+            emoji: data.emoji || defaultCat?.emoji || '💰',
+            budget: data.budget,
+            spent: data.spent,
+            remaining: data.budget - data.spent,
+            percentage: data.budget > 0 ? (data.spent / data.budget) * 100 : 0
+          };
+        });
 
-      budgetData.set({
-        categories: budget.categories,
-        totalBudget: budget.totalBudget,
-        totalSpent: budget.totalSpent
-      });
+        budgetData.set({
+          categories: budget.categories,
+          totalBudget: budget.totalBudget,
+          totalSpent: budget.totalSpent
+        });
 
-      console.log('✅ Budget loaded from Firebase:', budget);
-      console.log('📊 Categories:', categories.length);
-    } else {
-      // No budget found - empty state
+        console.log('✅ Budget loaded from Firebase:', budget);
+        console.log('📊 Categories:', categories.length);
+      } else {
+        // No budget found - empty state
+        categories = [];
+        budgetData.set({
+          categories: {},
+          totalBudget: 0,
+          totalSpent: 0
+        });
+        console.log('ℹ️ No budget found for period', currentPeriodId, ', showing empty state');
+      }
+    } catch (error) {
+      console.error('❌ Error loading budget data:', error);
       categories = [];
       budgetData.set({
         categories: {},
         totalBudget: 0,
         totalSpent: 0
       });
-      console.log('ℹ️ No budget found, showing empty state');
+    } finally {
+      isLoading = false;
     }
-  } catch (error) {
-    console.error('❌ Error loading budget data:', error);
-    categories = [];
-  } finally {
-    isLoading = false;
   }
-}
 </script>
 
 <ToastContainer />
@@ -939,6 +916,76 @@
           </div>
         </div>
       </div>
+
+      <!-- Add Category Form - Shown in empty state too -->
+      {#if showAddCategoryForm}
+        <div class="add-category-form glass-card" class:visible={showAddCategoryForm}>
+          <div class="form-header">
+            <h4>Add New Category</h4>
+          </div>
+
+          <div class="form-content">
+            <div class="form-group">
+              <label for="category-name">Category Name</label>
+              <div class="category-name-input-group">
+                <!-- Emoji display box (read-only, auto-generated) -->
+                <div class="emoji-display-box">
+                  <span class="emoji-display">{newCategoryData.emoji}</span>
+                </div>
+
+                <!-- Category name input -->
+                <input
+                  id="category-name"
+                  type="text"
+                  class="glass-input category-name-input"
+                  class:error={categoryFormErrors.name}
+                  bind:value={newCategoryData.name}
+                  on:input={handleCategoryNameInput}
+                  placeholder="e.g., Food, Transport"
+                  disabled={isSavingCategory}
+                />
+              </div>
+              {#if categoryFormErrors.name}
+                <span class="error-message">{categoryFormErrors.name}</span>
+              {/if}
+            </div>
+
+            <div class="form-group">
+              <label for="category-budget">Budget Amount</label>
+              <div class="currency-input-group">
+                <span class="currency-prefix">Rp</span>
+                <input
+                  id="category-budget"
+                  type="text"
+                  class="glass-input currency-input"
+                  class:error={categoryFormErrors.budget}
+                  value={formatCurrencyInput(newCategoryData.budget)}
+                  on:input={handleBudgetAmountInput}
+                  placeholder="0"
+                  disabled={isSavingCategory}
+                />
+              </div>
+              {#if categoryFormErrors.budget}
+                <span class="error-message">{categoryFormErrors.budget}</span>
+              {/if}
+            </div>
+
+            <div class="form-actions">
+              <button class="btn-secondary" on:click={handleCancelAddCategory} disabled={isSavingCategory}>
+                Cancel
+              </button>
+              <button class="btn-primary" on:click={handleSaveNewCategory} disabled={isSavingCategory}>
+                {#if isSavingCategory}
+                  <span class="btn-spinner"></span>
+                  Saving...
+                {:else}
+                  Add Category
+                {/if}
+              </button>
+            </div>
+          </div>
+        </div>
+      {/if}
   {:else}
     <!-- Budget Overview - Enhanced Hero Card -->
     <div class="budget-overview hero-budget-card liquid-card">
@@ -1032,76 +1079,6 @@
           <span>Add Category</span>
         </button>
       </div>
-
-      {#if showAddCategoryForm}
-        <!-- Add Category Form -->
-        <div class="add-category-form glass-card" class:visible={showAddCategoryForm}>
-          <div class="form-header">
-            <h4>Add New Category</h4>
-          </div>
-
-          <div class="form-content">
-            <div class="form-group">
-              <label for="category-name">Category Name</label>
-              <div class="category-name-input-group">
-                <!-- Emoji display box (read-only, auto-generated) -->
-                <div class="emoji-display-box">
-                  <span class="emoji-display">{newCategoryData.emoji}</span>
-                </div>
-
-                <!-- Category name input -->
-                <input
-                  id="category-name"
-                  type="text"
-                  class="glass-input category-name-input"
-                  class:error={categoryFormErrors.name}
-                  bind:value={newCategoryData.name}
-                  on:input={handleCategoryNameInput}
-                  placeholder="e.g., Food, Transport"
-                  disabled={isSavingCategory}
-                />
-              </div>
-              {#if categoryFormErrors.name}
-                <span class="error-message">{categoryFormErrors.name}</span>
-              {/if}
-            </div>
-
-            <div class="form-group">
-              <label for="category-budget">Budget Amount</label>
-              <div class="currency-input-group">
-                <span class="currency-prefix">Rp</span>
-                <input
-                  id="category-budget"
-                  type="text"
-                  class="glass-input currency-input"
-                  class:error={categoryFormErrors.budget}
-                  value={formatCurrencyInput(newCategoryData.budget)}
-                  on:input={handleBudgetAmountInput}
-                  placeholder="0"
-                  disabled={isSavingCategory}
-                />
-              </div>
-              {#if categoryFormErrors.budget}
-                <span class="error-message">{categoryFormErrors.budget}</span>
-              {/if}
-            </div>
-
-            <div class="form-actions">
-              <button class="btn-secondary" on:click={handleCancelAddCategory} disabled={isSavingCategory}>
-                Cancel
-              </button>
-              <button class="btn-primary" on:click={handleSaveNewCategory} disabled={isSavingCategory}>
-                {#if isSavingCategory}
-                  <span class="btn-spinner"></span>
-                  Saving...
-                {:else}
-                  Add Category
-                {/if}
-              </button>
-            </div>
-          </div>
-        </div>
-      {/if}
 
       <div class="categories-list">
         {#each categories as category (category.id)}
@@ -2200,6 +2177,17 @@
     /* Smooth entrance animation */
     animation: slideDownFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     transform-origin: top center;
+    display: flex;
+    flex-direction: column;
+    opacity: 1;
+    max-height: 1000px;
+    overflow: visible;
+  }
+
+  .add-category-form.visible {
+    display: flex;
+    opacity: 1;
+    max-height: 1000px;
   }
 
   @keyframes slideDownFadeIn {

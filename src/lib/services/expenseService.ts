@@ -36,13 +36,26 @@ export class ExpenseService {
 
   /**
    * Get current authenticated user ID
+   * Waits for auth state to be ready before returning
    */
   private async getCurrentUserId(): Promise<string | null> {
     if (!browser) return null;
 
     try {
-      const { auth } = await import('$lib/config/firebase');
-      return auth.currentUser?.uid || null;
+      const { auth, onAuthStateChanged } = await import('$lib/config/firebase');
+
+      // If user is already available, return immediately
+      if (auth.currentUser) {
+        return auth.currentUser.uid;
+      }
+
+      // Otherwise, wait for auth state to initialize
+      return new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          unsubscribe();
+          resolve(user?.uid || null);
+        });
+      });
     } catch (error) {
       console.error('Error getting current user:', error);
       return null;

@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { slide } from 'svelte/transition';
-  import toast from 'svelte-french-toast';
+  import toast, { Toaster } from 'svelte-french-toast';
   import {
     expensesStore,
     filteredExpenses,
@@ -17,7 +17,7 @@
   } from '../../lib/stores/expenses';
   import { budgetStore, budgetCategoriesStore } from '../../lib/stores/budget';
   import { expenseService } from '../../lib/services/expenseService';
-  import { budgetService } from '../../lib/services/budgetService';
+  import { budgetService, DEFAULT_CATEGORIES } from '../../lib/services/budgetService';
   import { periodService } from '../../lib/services/periodService';
   import InlineCategorySelector from '../../lib/components/expense/InlineCategorySelector.svelte';
   import PeriodSelector from '$lib/components/dashboard/PeriodSelector.svelte';
@@ -132,6 +132,13 @@
   $: groupedExpenses = $groupedExpensesByDate;
   $: totalExpenses = $filteredExpensesTotal;
 
+  // Format categories for InlineCategorySelector component
+  $: formattedCategories = categories.map(cat => ({
+    value: cat.id || cat.name,
+    label: cat.name,
+    icon: cat.emoji
+  }));
+
   async function loadExpensesData() {
     expenseActions.setLoading(true);
 
@@ -176,9 +183,40 @@
   }
 
   async function loadCategories() {
-    // 🧪 TESTING MODE: EMPTY CATEGORIES
-    categories = [];
-    console.log('🧪 TESTING: Categories - Empty state');
+    try {
+      // Load categories from budget
+      const budget = await budgetService.getBudgetByPeriod(currentPeriodId);
+
+      if (budget && budget.categories) {
+        // Convert budget categories to array format for dropdown
+        // ONLY show categories that exist in budget (with budget > 0 or spent > 0)
+        categories = Object.entries(budget.categories)
+          .filter(([id, data]: [string, any]) => {
+            // Only include categories that have been actually set up (budget > 0 or spent > 0)
+            return data.budget > 0 || data.spent > 0;
+          })
+          .map(([id, data]: [string, any]) => {
+            // Find default category info (case-insensitive match)
+            const defaultCat = DEFAULT_CATEGORIES?.find(c => c.id.toUpperCase() === id.toUpperCase());
+            return {
+              id,
+              // Use saved name/emoji if available, otherwise fallback to default
+              name: data.name || defaultCat?.name || id,
+              emoji: data.emoji || defaultCat?.emoji || '💰',
+              budget: data.budget,
+              spent: data.spent
+            };
+          });
+        console.log('✅ Categories loaded from budget:', categories.length);
+      } else {
+        // No budget yet, no categories
+        categories = [];
+        console.log('ℹ️ No budget found, no categories available');
+      }
+    } catch (error) {
+      console.error('❌ Error loading categories:', error);
+      categories = [];
+    }
   }
 
   function handleCategoryFilter(category: string) {
@@ -458,7 +496,7 @@
           >
             All
           </button>
-          {#each categories as category}
+          {#each formattedCategories as category}
             <button
               class="category-chip"
               class:active={selectedCategory === category.value}
@@ -519,7 +557,7 @@
                     {#if activeExpenseId === expense.id}
                       <InlineCategorySelector
                         currentCategory={expense.category}
-                        {categories}
+                        categories={formattedCategories}
                         isOpen={categoryDropdownOpen[expense.id] || false}
                         on:toggle={() => handleDropdownToggle(expense)}
                         on:categoryChange={(e) => handleCategoryChange(expense, e)}
@@ -572,6 +610,9 @@
     </div>
   </footer>
 </div>
+
+<!-- Toast Notifications -->
+<Toaster position="top-center" />
 
 <style>
   /* ===== ENHANCED EXPENSES PAGE WITH DESIGN SYSTEM ===== */

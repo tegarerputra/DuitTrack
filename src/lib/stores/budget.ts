@@ -391,5 +391,7 @@ export const budgetActions = {
 // Compatibility alias for components expecting budgetStore
 export const budgetStore = {
   subscribe: currentBudgetStore.subscribe,
+  set: currentBudgetStore.set,
+  update: currentBudgetStore.update,
   loadBudgetData: budgetActions.loadBudgetData
 };

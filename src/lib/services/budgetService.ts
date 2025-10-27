@@ -68,13 +68,26 @@ export class BudgetService {
 
   /**
    * Get current authenticated user ID
+   * Waits for auth state to be ready before returning
    */
   private async getCurrentUserId(): Promise<string | null> {
     if (!browser) return null;
 
     try {
-      const { auth } = await import('$lib/config/firebase');
-      return auth.currentUser?.uid || null;
+      const { auth, onAuthStateChanged } = await import('$lib/config/firebase');
+
+      // If user is already available, return immediately
+      if (auth.currentUser) {
+        return auth.currentUser.uid;
+      }
+
+      // Otherwise, wait for auth state to initialize
+      return new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          unsubscribe();
+          resolve(user?.uid || null);
+        });
+      });
     } catch (error) {
       console.error('Error getting current user:', error);
       return null;
@@ -360,18 +373,32 @@ export class BudgetService {
   /**
    * Add a new category to budget
    */
-  async addCategory(periodId: string, categoryId: string, budgetAmount: number = 0): Promise<void> {
+  async addCategory(periodId: string, categoryId: string, budgetAmount: number = 0, categoryName?: string, categoryEmoji?: string): Promise<void> {
     if (!browser) throw new Error('Not in browser environment');
 
     try {
       const budget = await this.getBudgetByPeriod(periodId);
+
+      // Create category data with name and emoji
+      const categoryData: any = {
+        budget: budgetAmount,
+        spent: 0
+      };
+
+      // Add name and emoji if provided (for custom categories)
+      if (categoryName) {
+        categoryData.name = categoryName;
+      }
+      if (categoryEmoji) {
+        categoryData.emoji = categoryEmoji;
+      }
 
       if (!budget) {
         // Create new budget with this category
         const newBudget: Omit<Budget, 'id' | 'userId' | 'createdAt' | 'updatedAt'> = {
           periodId,
           categories: {
-            [categoryId.toUpperCase()]: { budget: budgetAmount, spent: 0 }
+            [categoryId.toUpperCase()]: categoryData
           },
           totalBudget: budgetAmount,
           totalSpent: 0
@@ -381,7 +408,7 @@ export class BudgetService {
         // Add category to existing budget
         const updatedCategories = {
           ...budget.categories,
-          [categoryId.toUpperCase()]: { budget: budgetAmount, spent: 0 }
+          [categoryId.toUpperCase()]: categoryData
         };
 
         const totalBudget = Object.values(updatedCategories).reduce(
@@ -396,7 +423,7 @@ export class BudgetService {
         });
       }
 
-      console.log(`✅ Category added: ${categoryId} with budget Rp ${budgetAmount.toLocaleString('id-ID')}`);
+      console.log(`✅ Category added: ${categoryId} (${categoryName || categoryId}) with budget Rp ${budgetAmount.toLocaleString('id-ID')}`);
     } catch (error) {
       console.error('Error adding category:', error);
       throw error;

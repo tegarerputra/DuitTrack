@@ -1,6 +1,0 @@
-# Netlify Redirects for DuitTrack
-# SPA routing is handled automatically by @sveltejs/adapter-netlify
-# Only add custom redirects here if needed
-
-# Example: API redirects to Netlify Functions (uncomment if you have serverless functions)
-# /api/*  /.netlify/functions/:splat  200

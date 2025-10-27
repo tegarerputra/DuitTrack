@@ -480,7 +480,7 @@ export const FirebaseUtils = {
 };
 
 // Export Firebase instances (only available in browser)
-export { app, auth, db, storage, googleProvider };
+export { app, auth, db, storage, googleProvider, onAuthStateChanged };
 
 // Backward compatibility for existing vanilla JS code
 if (browser && typeof window !== 'undefined') {

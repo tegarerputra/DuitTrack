@@ -18,6 +18,12 @@ Comprehensive documentation is available in the `documentation/` directory:
 - 04_DEVELOPMENT_ROADMAP.md
 - 05_IMPLEMENTATION_GUIDE.md
 
+## Deployment
+This project is configured for **Cloudflare Pages** deployment:
+- **Deployment Guide:** [CLOUDFLARE_DEPLOYMENT_GUIDE.md](./CLOUDFLARE_DEPLOYMENT_GUIDE.md)
+- **Framework:** SvelteKit with `@sveltejs/adapter-cloudflare`
+- **Hosting:** Unlimited bandwidth, 200+ CDN locations, FREE forever!
+
 ## Tech Stack
 - Vite
 - Svelte

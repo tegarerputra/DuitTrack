@@ -145,18 +145,20 @@
         </div>
       {:else}
         {#each categories as category}
-          <button
-            class="category-option"
-            class:active={category.value.toUpperCase() === currentCategory.toUpperCase()}
-            on:click={(e) => handleCategorySelect(category.value, e)}
-            type="button"
-          >
-            <span class="category-icon">{getCategoryIcon(category.value)}</span>
-            <span class="category-label">{category.label}</span>
-            {#if category.value.toUpperCase() === currentCategory.toUpperCase()}
-              <span class="checkmark">✓</span>
-            {/if}
-          </button>
+          {#if category && category.value}
+            <button
+              class="category-option"
+              class:active={category.value.toUpperCase() === currentCategory?.toUpperCase()}
+              on:click={(e) => handleCategorySelect(category.value, e)}
+              type="button"
+            >
+              <span class="category-icon">{getCategoryIcon(category.value)}</span>
+              <span class="category-label">{category.label}</span>
+              {#if category.value.toUpperCase() === currentCategory?.toUpperCase()}
+                <span class="checkmark">✓</span>
+              {/if}
+            </button>
+          {/if}
         {/each}
       {/if}
     </div>

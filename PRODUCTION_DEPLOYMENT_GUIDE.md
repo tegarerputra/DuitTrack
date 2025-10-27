@@ -1,8 +1,20 @@
-# 🚀 DuitTrack Production Deployment Guide
+# ⚠️ DEPRECATED: This guide is for Netlify deployment
+
+> **🚨 NOTICE:** This project has migrated to **Cloudflare Pages**
+>
+> **Please use:** [CLOUDFLARE_DEPLOYMENT_GUIDE.md](./CLOUDFLARE_DEPLOYMENT_GUIDE.md)
+>
+> **Reason for migration:** Netlify changed to a paid credit system in 2025, while Cloudflare Pages offers unlimited bandwidth for free.
+>
+> This file is kept for historical reference only.
+
+---
+
+# 🚀 DuitTrack Production Deployment Guide (NETLIFY - DEPRECATED)
 **Production-Ready Checklist for Netlify Deployment**
 
 > Last Updated: 2025-01-25
-> Status: ✅ Ready for Production
+> Status: ⚠️ DEPRECATED - Use Cloudflare Pages instead
 
 ---
 
