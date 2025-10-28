@@ -53,6 +53,7 @@
     budget: ''
   };
   let isSavingCategory = false;
+  let isTogglingForm = false; // Prevent rapid toggle clicks
 
   // Emoji mapping dictionary for auto-generation (Indonesian + English)
   const emojiMapping: Record<string, string> = {
@@ -599,9 +600,48 @@
     return isValid;
   }
 
+  function handleToggleAddCategory() {
+    // Prevent rapid/double clicks
+    if (isTogglingForm) {
+      console.log('⚠️ Already toggling, ignoring click');
+      return;
+    }
+
+    isTogglingForm = true;
+    console.log('🔵 handleToggleAddCategory called');
+    console.log('🔵 Current showAddCategoryForm:', showAddCategoryForm);
+
+    if (showAddCategoryForm) {
+      // Close the form
+      showAddCategoryForm = false;
+      console.log('🔵 Closing form');
+    } else {
+      // Open the form
+      showAddCategoryForm = true;
+      console.log('🔵 Opening form');
+      // Reset form data when opening
+      newCategoryData = {
+        id: '',
+        name: '',
+        emoji: '💰',
+        budget: 0
+      };
+      categoryFormErrors = { name: '', emoji: '', budget: '' };
+    }
+
+    console.log('🔵 New showAddCategoryForm:', showAddCategoryForm);
+
+    // Reset toggle lock after a short delay
+    setTimeout(() => {
+      isTogglingForm = false;
+    }, 100);
+  }
+
   function handleShowAddCategory() {
+    console.log('🔵 handleShowAddCategory called');
+    console.log('🔵 Before - showAddCategoryForm:', showAddCategoryForm);
+    console.log('🔵 Before - isSavingCategory:', isSavingCategory);
     showAddCategoryForm = true;
-    console.log('Form opened, showAddCategoryForm:', showAddCategoryForm);
     newCategoryData = {
       id: '',
       name: '',
@@ -609,6 +649,8 @@
       budget: 0
     };
     categoryFormErrors = { name: '', emoji: '', budget: '' };
+    console.log('🔵 After - showAddCategoryForm:', showAddCategoryForm);
+    console.log('🔵 After - newCategoryData:', newCategoryData);
   }
 
   function handleCancelAddCategory() {
@@ -652,17 +694,30 @@
       });
 
       showAddCategoryForm = false;
-      categoryFormErrors = { name: '', emoji: '', budget: '' };
 
       // Show success toast
       toastStore.success(`Kategori "${newCategoryData.name.trim()}" berhasil ditambahkan!`);
+
+      // Reset form data after successful save
+      newCategoryData = {
+        id: '',
+        name: '',
+        emoji: '💰',
+        budget: 0
+      };
+      categoryFormErrors = { name: '', emoji: '', budget: '' };
+
+      console.log('✅ Category saved successfully, form reset');
+      console.log('✅ showAddCategoryForm:', showAddCategoryForm);
+      console.log('✅ newCategoryData:', newCategoryData);
     } catch (error) {
-      console.error('Error saving category:', error);
+      console.error('❌ Error saving category:', error);
       const errorMessage = error instanceof Error ? error.message : 'Gagal menyimpan kategori';
       categoryFormErrors.budget = errorMessage;
       toastStore.error(errorMessage);
     } finally {
       isSavingCategory = false;
+      console.log('🏁 Finally block - isSavingCategory:', isSavingCategory);
     }
   }
 
@@ -916,76 +971,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Add Category Form - Shown in empty state too -->
-      {#if showAddCategoryForm}
-        <div class="add-category-form glass-card" class:visible={showAddCategoryForm}>
-          <div class="form-header">
-            <h4>Add New Category</h4>
-          </div>
-
-          <div class="form-content">
-            <div class="form-group">
-              <label for="category-name">Category Name</label>
-              <div class="category-name-input-group">
-                <!-- Emoji display box (read-only, auto-generated) -->
-                <div class="emoji-display-box">
-                  <span class="emoji-display">{newCategoryData.emoji}</span>
-                </div>
-
-                <!-- Category name input -->
-                <input
-                  id="category-name"
-                  type="text"
-                  class="glass-input category-name-input"
-                  class:error={categoryFormErrors.name}
-                  bind:value={newCategoryData.name}
-                  on:input={handleCategoryNameInput}
-                  placeholder="e.g., Food, Transport"
-                  disabled={isSavingCategory}
-                />
-              </div>
-              {#if categoryFormErrors.name}
-                <span class="error-message">{categoryFormErrors.name}</span>
-              {/if}
-            </div>
-
-            <div class="form-group">
-              <label for="category-budget">Budget Amount</label>
-              <div class="currency-input-group">
-                <span class="currency-prefix">Rp</span>
-                <input
-                  id="category-budget"
-                  type="text"
-                  class="glass-input currency-input"
-                  class:error={categoryFormErrors.budget}
-                  value={formatCurrencyInput(newCategoryData.budget)}
-                  on:input={handleBudgetAmountInput}
-                  placeholder="0"
-                  disabled={isSavingCategory}
-                />
-              </div>
-              {#if categoryFormErrors.budget}
-                <span class="error-message">{categoryFormErrors.budget}</span>
-              {/if}
-            </div>
-
-            <div class="form-actions">
-              <button class="btn-secondary" on:click={handleCancelAddCategory} disabled={isSavingCategory}>
-                Cancel
-              </button>
-              <button class="btn-primary" on:click={handleSaveNewCategory} disabled={isSavingCategory}>
-                {#if isSavingCategory}
-                  <span class="btn-spinner"></span>
-                  Saving...
-                {:else}
-                  Add Category
-                {/if}
-              </button>
-            </div>
-          </div>
-        </div>
-      {/if}
   {:else}
     <!-- Budget Overview - Enhanced Hero Card -->
     <div class="budget-overview hero-budget-card liquid-card">
@@ -1070,16 +1055,85 @@
         <button
           class="add-category-btn"
           class:is-open={showAddCategoryForm}
-          on:click={showAddCategoryForm ? handleCancelAddCategory : handleShowAddCategory}
+          on:click|stopPropagation={handleToggleAddCategory}
           disabled={isSavingCategory}
         >
-          {#key showAddCategoryForm}
-            <span class="btn-icon">{buttonIcon}</span>
-          {/key}
+          <span class="btn-icon">{buttonIcon}</span>
           <span>Add Category</span>
         </button>
       </div>
 
+      <!-- Add Category Form - Positioned below button, above list -->
+      {#if showAddCategoryForm}
+    <div class="add-category-form glass-card" class:visible={showAddCategoryForm}>
+      <div class="form-header">
+        <h4>Add New Category</h4>
+      </div>
+
+      <div class="form-content">
+        <div class="form-group">
+          <label for="category-name">Category Name</label>
+          <div class="category-name-input-group">
+            <!-- Emoji display box (read-only, auto-generated) -->
+            <div class="emoji-display-box">
+              <span class="emoji-display">{newCategoryData.emoji}</span>
+            </div>
+
+            <!-- Category name input -->
+            <input
+              id="category-name"
+              type="text"
+              class="glass-input category-name-input"
+              class:error={categoryFormErrors.name}
+              bind:value={newCategoryData.name}
+              on:input={handleCategoryNameInput}
+              placeholder="e.g., Food, Transport"
+              disabled={isSavingCategory}
+            />
+          </div>
+          {#if categoryFormErrors.name}
+            <span class="error-message">{categoryFormErrors.name}</span>
+          {/if}
+        </div>
+
+        <div class="form-group">
+          <label for="category-budget">Budget Amount</label>
+          <div class="currency-input-group">
+            <span class="currency-prefix">Rp</span>
+            <input
+              id="category-budget"
+              type="text"
+              class="glass-input currency-input"
+              class:error={categoryFormErrors.budget}
+              value={formatCurrencyInput(newCategoryData.budget)}
+              on:input={handleBudgetAmountInput}
+              placeholder="0"
+              disabled={isSavingCategory}
+            />
+          </div>
+          {#if categoryFormErrors.budget}
+            <span class="error-message">{categoryFormErrors.budget}</span>
+          {/if}
+        </div>
+
+        <div class="form-actions">
+          <button class="btn-secondary" on:click={handleCancelAddCategory} disabled={isSavingCategory}>
+            Cancel
+          </button>
+          <button class="btn-primary" on:click={handleSaveNewCategory} disabled={isSavingCategory}>
+            {#if isSavingCategory}
+              <span class="btn-spinner"></span>
+              Saving...
+            {:else}
+              Add Category
+            {/if}
+          </button>
+        </div>
+      </div>
+    </div>
+      {/if}
+
+      <!-- Categories List -->
       <div class="categories-list">
         {#each categories as category (category.id)}
           <CategoryBudgetItem

@@ -24,7 +24,7 @@
   import { userProfileStore } from '$stores/auth';
   import { selectedPeriodStore } from '$lib/stores/period';
   import { formatIDR, formatDate as formatDateUtil } from '$lib/utils/index';
-  import { getCategoryIcon, formatCategoryName } from '$lib/utils/categoryHelpers';
+  import { getCategoryIcon, formatCategoryName, setBudgetCategories } from '$lib/utils/categoryHelpers';
 
   // Skeleton Components
   import SkeletonHero from '$lib/components/skeleton/SkeletonHero.svelte';
@@ -208,14 +208,23 @@
             };
           });
         console.log('✅ Categories loaded from budget:', categories.length);
+
+        // Update category helpers with budget categories for emoji sync
+        setBudgetCategories(categories.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          emoji: cat.emoji
+        })));
       } else {
         // No budget yet, no categories
         categories = [];
         console.log('ℹ️ No budget found, no categories available');
+        setBudgetCategories([]); // Clear cache
       }
     } catch (error) {
       console.error('❌ Error loading categories:', error);
       categories = [];
+      setBudgetCategories([]); // Clear cache on error
     }
   }
 

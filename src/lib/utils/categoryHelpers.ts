@@ -1,11 +1,33 @@
 // Category helper functions for DuitTrack
 // Centralized category icons and names to avoid duplication
 
+// Store for budget categories (set from expenses/budget pages)
+let budgetCategoriesCache: Array<{ id: string; name: string; emoji: string }> = [];
+
+/**
+ * Set budget categories cache for emoji lookup
+ */
+export function setBudgetCategories(categories: Array<{ id: string; name: string; emoji: string }>) {
+  budgetCategoriesCache = categories;
+}
+
 /**
  * Get category icon emoji
+ * Now checks budget categories first for custom emojis
  */
 export function getCategoryIcon(category: string): string {
   if (!category) return '📦'; // Default icon for undefined/null
+
+  // First, try to find emoji from budget categories cache
+  const budgetCat = budgetCategoriesCache.find(
+    c => c.id.toLowerCase() === category.toLowerCase() ||
+         c.name.toLowerCase() === category.toLowerCase()
+  );
+  if (budgetCat?.emoji) {
+    return budgetCat.emoji;
+  }
+
+  // Fallback to default icons
   const normalizedCategory = category.toUpperCase();
   const icons: Record<string, string> = {
     'FOOD': '🍽️',
