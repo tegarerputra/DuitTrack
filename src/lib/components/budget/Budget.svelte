@@ -2,7 +2,8 @@
   import { onMount, createEventDispatcher } from 'svelte';
   import { writable, derived } from 'svelte/store';
   import { authService } from '../../services/authService';
-  import { budgetService, DEFAULT_CATEGORIES } from '../../services/budgetService';
+  import { budgetService, DEFAULT_CATEGORIES, UNCATEGORIZED_CATEGORY } from '../../services/budgetService';
+  import { expenseService } from '../../services/expenseService';
   import { periodService } from '../../services/periodService';
   import { DataService } from '../../services/dataService';
   import { toastStore } from '../../stores/toast';
@@ -27,6 +28,8 @@
   let categories: any[] = [];
   let isLoading = true; // ✅ Start with true for instant skeleton
   let dataService: DataService | null = null;
+  let pendingOperations = 0; // Track pending delete operations
+  let deletingCategoryId: string | null = null; // Track which category is being deleted
 
   // Subscribe to shared period store for cross-page persistence
   selectedPeriodStore.subscribe((value) => {
@@ -54,6 +57,12 @@
   };
   let isSavingCategory = false;
   let isTogglingForm = false; // Prevent rapid toggle clicks
+
+  // Delete confirmation dialog state
+  let showDeleteConfirmation = false;
+  let categoryToDelete: { id: string; name: string; emoji: string } | null = null;
+  let deleteConfirmationData: { expenseCount: number; totalAmount: number } | null = null;
+  let isDeletingCategory = false;
 
   // Emoji mapping dictionary for auto-generation (Indonesian + English)
   const emojiMapping: Record<string, string> = {
@@ -478,31 +487,101 @@
   }
 
   async function handleCategoryDelete(categoryId: string) {
-    try {
-      const categoryName = categories.find(cat => cat.id === categoryId)?.name || categoryId;
+    // Prevent multiple simultaneous deletes
+    if (deletingCategoryId || isDeletingCategory) {
+      toastStore.warning('Tunggu proses hapus sebelumnya selesai');
+      return;
+    }
 
-      // 🔥 FIREBASE: Remove category from Firestore
+    // Find category data
+    const category = categories.find(cat => cat.id === categoryId);
+    if (!category) {
+      toastStore.error('Kategori tidak ditemukan');
+      return;
+    }
+
+    try {
+      // Count expenses with this category
+      const { count, totalAmount } = await expenseService.countExpensesByCategory(categoryId, currentPeriodId);
+
+      // Store category info for confirmation dialog
+      categoryToDelete = {
+        id: categoryId,
+        name: category.name || categoryId,
+        emoji: category.emoji || '📦'
+      };
+      deleteConfirmationData = { expenseCount: count, totalAmount };
+
+      // Show confirmation dialog
+      showDeleteConfirmation = true;
+    } catch (error) {
+      console.error('❌ Error counting expenses:', error);
+      toastStore.error('Gagal menghitung transaksi kategori');
+    }
+  }
+
+  async function confirmDeleteCategory() {
+    if (!categoryToDelete || isDeletingCategory) return;
+
+    pendingOperations++;
+    deletingCategoryId = categoryToDelete.id;
+    isDeletingCategory = true;
+
+    try {
+      const { id: categoryId, name: categoryName } = categoryToDelete;
+      const expenseCount = deleteConfirmationData?.expenseCount || 0;
+
+      // Show loading toast
+      toastStore.info(`Menghapus kategori "${categoryName}"...`);
+
+      // 1. Reassign all expenses to UNCATEGORIZED if there are any
+      if (expenseCount > 0) {
+        console.log(`📦 Reassigning ${expenseCount} expenses to UNCATEGORIZED...`);
+        const reassignedCount = await expenseService.reassignCategory(categoryId, 'UNCATEGORIZED', currentPeriodId);
+        console.log(`✅ Reassigned ${reassignedCount} expenses to UNCATEGORIZED`);
+      }
+
+      // 2. Remove category from budget
       await budgetService.removeCategory(currentPeriodId, categoryId);
 
-      // Update local state
-      categories = categories.filter(cat => cat.id !== categoryId);
+      // 3. If there were expenses, recalculate budget to update UNCATEGORIZED spending
+      if (expenseCount > 0) {
+        await budgetService.recalculateSpending(currentPeriodId);
+      }
 
-      budgetData.update(data => {
-        if (!data) return data;
-        const newCategories = { ...data.categories };
-        delete newCategories[categoryId];
-        return {
-          ...data,
-          categories: newCategories
-        };
-      });
+      // 4. Force refresh from server
+      await loadBudgetDataFromFirebase(true);
 
-      toastStore.success(`Kategori "${categoryName}" berhasil dihapus`);
-      console.log(`✅ Category deleted: ${categoryId}`);
+      // 5. Show success message
+      const message = expenseCount > 0
+        ? `Kategori "${categoryName}" dihapus. ${expenseCount} transaksi dipindahkan ke "Tanpa Kategori"`
+        : `Kategori "${categoryName}" berhasil dihapus`;
+
+      toastStore.success(message);
+      console.log(`✅ Category deleted and persisted: ${categoryId}`);
+
+      // Close confirmation dialog
+      showDeleteConfirmation = false;
+      categoryToDelete = null;
+      deleteConfirmationData = null;
     } catch (error) {
       console.error('❌ Error deleting category:', error);
+
+      // Reload data to ensure UI is in sync
+      await loadBudgetDataFromFirebase(true);
+
       toastStore.error('Gagal menghapus kategori. Silakan coba lagi.');
+    } finally {
+      pendingOperations--;
+      deletingCategoryId = null;
+      isDeletingCategory = false;
     }
+  }
+
+  function cancelDeleteCategory() {
+    showDeleteConfirmation = false;
+    categoryToDelete = null;
+    deleteConfirmationData = null;
   }
 
   async function handleAddCategory(categoryData: { id: string; name: string; emoji: string; budget: number }) {
@@ -842,30 +921,51 @@
     return Math.max(0, diffDays);
   }
 
-  async function loadBudgetDataFromFirebase() {
+  async function loadBudgetDataFromFirebase(forceFromServer: boolean = false) {
     try {
       // Set loading to true at the start
       isLoading = true;
-      console.log('🔄 Loading budget data from Firebase for period:', currentPeriodId);
+      console.log('🔄 Loading budget data from Firebase for period:', currentPeriodId, forceFromServer ? '(force from server)' : '');
 
       // 🔥 FIREBASE: Load budget from Firestore
-      const budget = await budgetService.getBudgetByPeriod(currentPeriodId);
+      const budget = await budgetService.getBudgetByPeriod(currentPeriodId, forceFromServer);
 
       if (budget && budget.categories) {
         // Budget exists - convert to categories array
-        categories = Object.entries(budget.categories).map(([id, data]: [string, any]) => {
-          const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === id);
-          return {
-            id,
-            // Use saved name/emoji if available, otherwise fallback to default
-            name: data.name || defaultCat?.name || id,
-            emoji: data.emoji || defaultCat?.emoji || '💰',
-            budget: data.budget,
-            spent: data.spent,
-            remaining: data.budget - data.spent,
-            percentage: data.budget > 0 ? (data.spent / data.budget) * 100 : 0
+        const regularCategories = Object.entries(budget.categories)
+          .filter(([id]) => id !== 'UNCATEGORIZED') // Exclude UNCATEGORIZED from regular list
+          .map(([id, data]: [string, any]) => {
+            const defaultCat = DEFAULT_CATEGORIES.find(c => c.id === id);
+            return {
+              id,
+              // Use saved name/emoji if available, otherwise fallback to default
+              name: data.name || defaultCat?.name || id,
+              emoji: data.emoji || defaultCat?.emoji || '💰',
+              budget: data.budget,
+              spent: data.spent,
+              remaining: data.budget - data.spent,
+              percentage: data.budget > 0 ? (data.spent / data.budget) * 100 : 0
+            };
+          });
+
+        // Check if UNCATEGORIZED category has expenses
+        const uncategorizedData = budget.categories['UNCATEGORIZED'];
+        if (uncategorizedData && uncategorizedData.spent > 0) {
+          // Add UNCATEGORIZED at the end with special styling
+          const uncategorizedCategory = {
+            id: 'UNCATEGORIZED',
+            name: UNCATEGORIZED_CATEGORY.name,
+            emoji: UNCATEGORIZED_CATEGORY.emoji,
+            budget: uncategorizedData.spent, // Budget equals spent (auto-calculated)
+            spent: uncategorizedData.spent,
+            remaining: 0,
+            percentage: 100,
+            isUncategorized: true // Special flag for styling
           };
-        });
+          categories = [...regularCategories, uncategorizedCategory];
+        } else {
+          categories = regularCategories;
+        }
 
         budgetData.set({
           categories: budget.categories,
@@ -1138,6 +1238,7 @@
         {#each categories as category (category.id)}
           <CategoryBudgetItem
             {category}
+            isDeleting={deletingCategoryId === category.id}
             on:budgetUpdate={(e) => handleCategoryBudgetUpdate(category.id, e.detail.amount)}
             on:delete={() => handleCategoryDelete(category.id)}
           />
@@ -1148,6 +1249,56 @@
   {/if}
   </div>
 </div>
+
+<!-- Delete Confirmation Dialog -->
+{#if showDeleteConfirmation && categoryToDelete}
+  <div class="modal-backdrop" on:click={cancelDeleteCategory}>
+    <div class="modal-container" on:click|stopPropagation>
+      <div class="modal-header">
+        <h3 class="modal-title">Hapus Kategori {categoryToDelete.emoji} {categoryToDelete.name}?</h3>
+      </div>
+
+      <div class="modal-body">
+        {#if deleteConfirmationData && deleteConfirmationData.expenseCount > 0}
+          <div class="warning-box">
+            <div class="warning-icon">⚠️</div>
+            <div class="warning-content">
+              <p class="warning-title">
+                <strong>{deleteConfirmationData.expenseCount} transaksi</strong> ({formatCurrency(deleteConfirmationData.totalAmount)})
+                akan dipindahkan ke <strong>"Tanpa Kategori"</strong>
+              </p>
+              <p class="warning-subtitle">Transaksi tidak akan dihapus, hanya kategorinya yang berubah.</p>
+            </div>
+          </div>
+        {:else}
+          <p class="confirmation-message">Kategori ini tidak memiliki transaksi dan akan dihapus permanen.</p>
+        {/if}
+      </div>
+
+      <div class="modal-actions">
+        <button
+          class="btn-cancel"
+          on:click={cancelDeleteCategory}
+          disabled={isDeletingCategory}
+        >
+          Batal
+        </button>
+        <button
+          class="btn-delete"
+          on:click={confirmDeleteCategory}
+          disabled={isDeletingCategory}
+        >
+          {#if isDeletingCategory}
+            <span class="loading-spinner"></span>
+            Menghapus...
+          {:else}
+            Hapus Kategori
+          {/if}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   /* ===== GLASSMORPHISM DESIGN SYSTEM - BUDGET PAGE ===== */
@@ -2748,5 +2899,214 @@
   @keyframes skeleton-shimmer {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
+  }
+
+  /* Delete Confirmation Modal */
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .modal-container {
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(248, 252, 255, 0.9) 100%);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    max-width: 500px;
+    width: 100%;
+    animation: slideUp 0.3s ease;
+  }
+
+  .modal-header {
+    padding: 1.5rem 1.5rem 1rem;
+    border-bottom: 1px solid rgba(0, 191, 255, 0.1);
+  }
+
+  .modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .warning-box {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg,
+      rgba(251, 191, 36, 0.1) 0%,
+      rgba(251, 146, 60, 0.1) 100%);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 12px;
+  }
+
+  .warning-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .warning-content {
+    flex: 1;
+  }
+
+  .warning-title {
+    font-size: 0.95rem;
+    color: #92400e;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.5;
+  }
+
+  .warning-subtitle {
+    font-size: 0.85rem;
+    color: #b45309;
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .confirmation-message {
+    font-size: 0.95rem;
+    color: #4b5563;
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .modal-actions {
+    padding: 1rem 1.5rem 1.5rem;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+  }
+
+  .btn-cancel,
+  .btn-delete {
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-cancel {
+    background: rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #4b5563;
+  }
+
+  .btn-cancel:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.5);
+    border-color: rgba(0, 0, 0, 0.15);
+  }
+
+  .btn-delete {
+    background: linear-gradient(135deg,
+      rgba(239, 68, 68, 0.9) 0%,
+      rgba(220, 38, 38, 0.95) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  }
+
+  .btn-delete:hover:not(:disabled) {
+    background: linear-gradient(135deg,
+      rgba(239, 68, 68, 1) 0%,
+      rgba(220, 38, 38, 1) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+  }
+
+  .btn-cancel:disabled,
+  .btn-delete:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .loading-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (max-width: 768px) {
+    .modal-container {
+      max-width: 95%;
+      margin: 0 auto;
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.25rem 0.75rem;
+    }
+
+    .modal-title {
+      font-size: 1.1rem;
+    }
+
+    .modal-body {
+      padding: 1.25rem;
+    }
+
+    .warning-box {
+      padding: 0.875rem;
+      gap: 0.75rem;
+    }
+
+    .warning-icon {
+      font-size: 1.75rem;
+    }
+
+    .modal-actions {
+      padding: 0.875rem 1.25rem 1.25rem;
+      flex-direction: column;
+    }
+
+    .btn-cancel,
+    .btn-delete {
+      width: 100%;
+      justify-content: center;
+    }
   }
 </style>

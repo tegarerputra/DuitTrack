@@ -135,14 +135,16 @@
       transition:slide={{ duration: 200, easing: quintOut }}
     >
       {#if categories.length === 0}
-        <!-- Empty state when no categories are set up -->
-        <div class="empty-state">
-          <div class="empty-icon">💡</div>
-          <div class="empty-message">
-            <div class="empty-title">Belum Ada Kategori</div>
-            <div class="empty-subtitle">Setup budget terlebih dahulu untuk menambahkan kategori pengeluaran</div>
-          </div>
-        </div>
+        <!-- Empty state when no categories are set up - Show UNCATEGORIZED as only option -->
+        <button
+          class="category-option active"
+          on:click={(e) => handleCategorySelect('UNCATEGORIZED', e)}
+          type="button"
+        >
+          <span class="category-icon">📦</span>
+          <span class="category-label">Tanpa Kategori</span>
+          <span class="checkmark">✓</span>
+        </button>
       {:else}
         {#each categories as category}
           {#if category && category.value}

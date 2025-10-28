@@ -375,6 +375,76 @@ export class ExpenseService {
       throw error;
     }
   }
+
+  /**
+   * Count expenses by category for a specific period
+   */
+  async countExpensesByCategory(categoryId: string, periodId: string): Promise<{ count: number; totalAmount: number }> {
+    if (!browser) return { count: 0, totalAmount: 0 };
+
+    try {
+      const expenses = await this.getExpensesByCategory(categoryId, periodId);
+      const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+      return {
+        count: expenses.length,
+        totalAmount
+      };
+    } catch (error) {
+      console.error('Error counting expenses by category:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reassign all expenses from one category to another
+   * Used when deleting a category to move expenses to UNCATEGORIZED
+   */
+  async reassignCategory(fromCategory: string, toCategory: string, periodId: string): Promise<number> {
+    if (!browser) throw new Error('Not in browser environment');
+
+    try {
+      const userId = await this.getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get all expenses with the old category
+      const expenses = await this.getExpensesByCategory(fromCategory, periodId);
+
+      if (expenses.length === 0) {
+        console.log(`No expenses found for category ${fromCategory}`);
+        return 0;
+      }
+
+      // Update each expense to new category
+      const { doc, updateDoc, serverTimestamp, writeBatch } = await import('firebase/firestore');
+      const { FirebaseUtils, db } = await import('$lib/config/firebase');
+
+      const expensesRef = FirebaseUtils.getUserExpensesRef(userId);
+
+      // Use batch write for better performance
+      const batch = writeBatch(db);
+
+      expenses.forEach((expense) => {
+        if (expense.id) {
+          const expenseRef = doc(expensesRef, expense.id);
+          batch.update(expenseRef, {
+            category: toCategory.toUpperCase(),
+            updatedAt: serverTimestamp()
+          });
+        }
+      });
+
+      await batch.commit();
+
+      console.log(`✅ Reassigned ${expenses.length} expenses from ${fromCategory} to ${toCategory}`);
+      return expenses.length;
+    } catch (error) {
+      console.error('Error reassigning category:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance

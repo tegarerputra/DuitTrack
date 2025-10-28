@@ -9,7 +9,12 @@
     emoji: string;
     budget: number;
     spent: number;
+    isUncategorized?: boolean; // Special flag for UNCATEGORIZED category
   };
+  export let isDeleting = false; // Track if this category is being deleted
+
+  // UNCATEGORIZED category cannot be edited or deleted
+  $: isReadOnly = category.isUncategorized === true || category.id === 'UNCATEGORIZED';
 
   let budgetInput = '';
   let originalBudget = '';
@@ -90,12 +95,13 @@
   }
 
   function handleDelete() {
-    if (confirm(`Are you sure you want to delete the ${category.name} category?`)) {
-      dispatch('delete');
-    }
+    if (isReadOnly) return; // Cannot delete UNCATEGORIZED
+    // Dispatch delete event - confirmation dialog will be shown in parent (Budget.svelte)
+    dispatch('delete');
   }
 
   function startEditing() {
+    if (isReadOnly) return; // Cannot edit UNCATEGORIZED
     isEditing = true;
     originalBudget = budgetInput;
     // Focus input after enabling edit mode
@@ -129,7 +135,15 @@
   }
 </script>
 
-<div class="category-budget-item glass-card">
+<div class="category-budget-item glass-card" class:deleting={isDeleting} class:uncategorized={isReadOnly}>
+  <!-- Loading Overlay -->
+  {#if isDeleting}
+    <div class="deleting-overlay">
+      <div class="spinner"></div>
+      <span class="deleting-text">Menghapus...</span>
+    </div>
+  {/if}
+
   <!-- Header: Icon + Name + Status Badge -->
   <div class="category-header">
     <div class="category-icon">{category.emoji}</div>
@@ -147,9 +161,11 @@
         {/if}
       </span>
     </div>
+    {#if !isReadOnly}
     <button
       type="button"
       class="delete-btn"
+      disabled={isDeleting}
       on:click={handleDelete}
       title="Delete category"
       aria-label="Delete {category.name} category"
@@ -160,6 +176,7 @@
         <path d="M6.667 7.333v4M9.333 7.333v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </button>
+    {/if}
   </div>
 
   <!-- Budget Input Section -->
@@ -203,6 +220,7 @@
           </svg>
         </button>
       {:else}
+        {#if !isReadOnly}
         <button
           type="button"
           class="budget-action-btn edit-btn"
@@ -215,6 +233,7 @@
             <path d="M10 4L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
+        {/if}
       {/if}
     </div>
     <div id="warning-{category.id}" class="budget-warning" style="display: none;">
@@ -281,6 +300,51 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.9);
     border-color: rgba(0, 191, 255, 0.25);
     transform: translateY(-2px);
+  }
+
+  /* Deleting state */
+  .category-budget-item.deleting {
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  /* Deleting overlay */
+  .deleting-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    border-radius: 16px;
+    z-index: 10;
+  }
+
+  /* Spinner animation */
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(6, 182, 212, 0.2);
+    border-top-color: #06b6d4;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .deleting-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0891b2;
+    letter-spacing: 0.02em;
   }
 
   /* Over-budget state */
@@ -414,6 +478,12 @@
   .delete-btn:focus {
     outline: 2px solid rgba(244, 67, 54, 0.5);
     outline-offset: 2px;
+  }
+
+  .delete-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
   }
 
   /* ===== BUDGET INPUT SECTION ===== */
@@ -792,5 +862,31 @@
     .amount-item {
       text-align: center;
     }
+  }
+
+  /* Uncategorized category styling - muted appearance */
+  .category-budget-item.uncategorized {
+    opacity: 0.85;
+    background: linear-gradient(135deg,
+      rgba(156, 163, 175, 0.05) 0%,
+      rgba(156, 163, 175, 0.1) 100%);
+    border-color: rgba(156, 163, 175, 0.15);
+  }
+
+  .category-budget-item.uncategorized .category-name {
+    color: #6b7280;
+    font-style: italic;
+  }
+
+  .category-budget-item.uncategorized .status-badge {
+    background: rgba(156, 163, 175, 0.15);
+    color: #6b7280;
+    border-color: rgba(156, 163, 175, 0.25);
+  }
+
+  .category-budget-item.uncategorized .budget-input {
+    background: rgba(156, 163, 175, 0.05);
+    color: #6b7280;
+    font-style: italic;
   }
 </style>

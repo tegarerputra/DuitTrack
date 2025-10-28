@@ -48,7 +48,7 @@
   // Form data stores
   const formData = writable({
     amount: '',
-    category: 'OTHER',
+    category: 'UNCATEGORIZED',
     description: '',
     date: dateValue
   });
@@ -89,7 +89,7 @@
   });
 
   // Watch for form changes to trigger smart validation
-  $: if ($formData.amount && $formData.category !== 'OTHER') {
+  $: if ($formData.amount && $formData.category !== 'UNCATEGORIZED') {
     debounceSmartValidation();
   }
 
@@ -130,7 +130,7 @@
     dateValue = getCurrentDate();
     formData.set({
       amount: '',
-      category: 'OTHER',
+      category: 'UNCATEGORIZED',
       description: '',
       date: dateValue
     });
@@ -270,7 +270,7 @@
     const amount = parseCurrencyInput(data.amount);
     const category = data.category;
 
-    if (amount <= 0 || category === 'OTHER') {
+    if (amount <= 0 || category === 'UNCATEGORIZED') {
       smartWarning.set({ show: false, type: '', data: {} });
       return;
     }
@@ -494,7 +494,8 @@
       'HEALTH': 'Kesehatan',
       'EDUCATION': 'Pendidikan',
       'UTILITIES': 'Tagihan',
-      'OTHER': 'Lainnya'
+      'OTHER': 'Lainnya',
+      'UNCATEGORIZED': 'Tanpa Kategori'
     };
     return names[category.toUpperCase()] || category;
   }
@@ -578,14 +579,14 @@
                   disabled={!hasCategories}
                 >
                   {#if hasCategories}
-                    <option value="OTHER">Choose category</option>
+                    <option value="UNCATEGORIZED">Tanpa Kategori</option>
                     {#each categories as category}
                       {#if !category.disabled}
                         <option value={category.value}>{category.label}</option>
                       {/if}
                     {/each}
                   {:else}
-                    <option value="OTHER">💡 Set up budget first to track by category</option>
+                    <option value="UNCATEGORIZED">Tanpa Kategori</option>
                   {/if}
                 </select>
                 <div class="select-arrow">▼</div>

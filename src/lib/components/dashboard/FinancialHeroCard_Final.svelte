@@ -119,11 +119,11 @@
           <span class="velocity-title-new">🎯 Spending Velocity</span>
           <div class="velocity-status-badge-new" class:on-track={velocity.status === 'on-track'} class:slow={velocity.status === 'slow'} class:too-fast={velocity.status === 'too-fast'}>
             {#if velocity.status === 'too-fast'}
-              🚨 TOO FAST
+              TERLALU CEPAT
             {:else if velocity.status === 'slow'}
-              ✅ ON TRACK (Hemat!)
+              SESUAI TARGET (Hemat!)
             {:else}
-              ✅ ON TRACK
+              SESUAI TARGET
             {/if}
           </div>
         </div>
@@ -719,19 +719,24 @@
       rgba(255, 255, 255, 0.4) 0%,
       rgba(255, 255, 255, 0.25) 100%);
     transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 14px 0 0 14px;
+    border-radius: 16px;
   }
 
-  /* Spending fill (foreground layer) */
+  /* Spending fill (foreground layer) - Monotone white dengan opacity 80% */
   .big-progress-spending {
     position: absolute;
     top: 0;
     left: 0;
     height: 100%;
-    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
-    border-radius: 14px 0 0 14px;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 16px;
     z-index: 2;
     animation: fill-slide 1.2s ease-out;
+    /* Monotone white dengan opacity 80% */
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   @keyframes fill-slide {
@@ -744,19 +749,14 @@
     }
   }
 
-  .big-progress-spending.on-track {
-    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
-    box-shadow: none;
-  }
-
-  .big-progress-spending.slow {
-    background: linear-gradient(90deg, #22d3ee 0%, #06b6d4 100%);
-    box-shadow: none;
-  }
-
+  /* Status classes tidak mengubah warna bar, hanya untuk consistency */
+  .big-progress-spending.on-track,
+  .big-progress-spending.slow,
   .big-progress-spending.too-fast {
-    background: linear-gradient(90deg, #f87171 0%, #ef4444 100%);
-    box-shadow: none;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   /* Inline indicators */
@@ -781,8 +781,8 @@
     font-size: 14px;
     font-weight: 700;
     white-space: nowrap;
-    color: white;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    color: #0891B2;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
 
   .big-indicator-emoji {
@@ -793,6 +793,7 @@
   .big-indicator-value {
     font-size: 18px;
     font-weight: 800;
+    color: #0369a1;
   }
 
   /* Clean Legend - No Boxes */
@@ -907,14 +908,6 @@
     font-size: 13px;
     font-weight: 700;
     color: white;
-  }
-
-  .insight-value.saving {
-    color: #d1fae5;
-  }
-
-  .insight-value.overspend {
-    color: #fecaca;
   }
 
   /* Mobile Responsive */

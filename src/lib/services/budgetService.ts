@@ -50,6 +50,18 @@ export const DEFAULT_CATEGORIES: BudgetCategory[] = [
 ];
 
 /**
+ * Special UNCATEGORIZED category for expenses without a category
+ * This category cannot be deleted or edited, and only appears if there are expenses with this category
+ */
+export const UNCATEGORIZED_CATEGORY: BudgetCategory = {
+  id: 'UNCATEGORIZED',
+  name: 'Tanpa Kategori',
+  emoji: '📦',
+  color: '#9CA3AF',
+  defaultBudget: 0
+};
+
+/**
  * Budget service that provides CRUD operations for budgets
  */
 export class BudgetService {
@@ -96,8 +108,9 @@ export class BudgetService {
 
   /**
    * Get budget for a specific period
+   * @param forceFromServer - If true, force read from server instead of cache
    */
-  async getBudgetByPeriod(periodId: string): Promise<Budget | null> {
+  async getBudgetByPeriod(periodId: string, forceFromServer: boolean = false): Promise<Budget | null> {
     if (!browser) return null;
 
     try {
@@ -106,12 +119,20 @@ export class BudgetService {
         throw new Error('User not authenticated');
       }
 
-      const { doc, getDoc } = await import('firebase/firestore');
+      const { doc, getDoc, getDocFromServer } = await import('firebase/firestore');
       const { FirebaseUtils } = await import('$lib/config/firebase');
 
       const budgetsRef = FirebaseUtils.getUserBudgetsRef(userId);
       const budgetRef = doc(budgetsRef, periodId);
-      const docSnap = await getDoc(budgetRef);
+
+      // Use getDocFromServer if forceFromServer is true to bypass cache
+      const docSnap = forceFromServer
+        ? await getDocFromServer(budgetRef)
+        : await getDoc(budgetRef);
+
+      if (forceFromServer) {
+        console.log(`🔥 Force reading from server for period ${periodId}`);
+      }
 
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -171,8 +192,12 @@ export class BudgetService {
         });
         console.log(`✅ Budget created for period ${budgetData.periodId}`);
       } else {
-        // Update existing budget
-        await setDoc(budgetRef, budget, { merge: true });
+        // Update existing budget - preserve createdAt, replace everything else
+        const existingData = docSnap.data();
+        await setDoc(budgetRef, {
+          ...budget,
+          createdAt: existingData.createdAt // Preserve original createdAt
+        }); // NO merge: true - this will replace the entire document
         console.log(`✅ Budget updated for period ${budgetData.periodId}`);
       }
     } catch (error) {
@@ -464,10 +489,32 @@ export class BudgetService {
         totalSpent
       });
 
+      // Wait for all pending writes to complete before resolving
+      await this.waitForPendingWrites();
+
       console.log(`✅ Category removed: ${categoryId}`);
     } catch (error) {
       console.error('Error removing category:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Wait for all pending writes to complete
+   * This ensures data is fully persisted to Firebase before proceeding
+   */
+  async waitForPendingWrites(): Promise<void> {
+    if (!browser) return;
+
+    try {
+      const { waitForPendingWrites } = await import('firebase/firestore');
+      const { db } = await import('$lib/config/firebase');
+
+      await waitForPendingWrites(db);
+      console.log('✅ All pending writes completed');
+    } catch (error) {
+      console.error('Error waiting for pending writes:', error);
+      // Don't throw error, just log it
     }
   }
 

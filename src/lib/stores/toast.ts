@@ -4,7 +4,7 @@ import { writable } from 'svelte/store';
 export interface ToastNotification {
   id: string;
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'warning';
   duration?: number;
 }
 
@@ -14,7 +14,7 @@ function createToastStore() {
   return {
     subscribe,
 
-    show: (message: string, type: 'success' | 'error' | 'info' = 'info', duration: number = 3000) => {
+    show: (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', duration: number = 3000) => {
       const id = `toast-${Date.now()}-${Math.random()}`;
       const toast: ToastNotification = { id, message, type, duration };
 
@@ -36,6 +36,10 @@ function createToastStore() {
 
     info: (message: string, duration?: number) => {
       toastStore.show(message, 'info', duration);
+    },
+
+    warning: (message: string, duration?: number) => {
+      toastStore.show(message, 'warning', duration);
     },
 
     remove: (id: string) => {

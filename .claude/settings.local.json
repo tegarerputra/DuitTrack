@@ -14,7 +14,11 @@
       "Bash(git commit:*)",
       "Bash(git push)",
       "Bash(npm uninstall:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(nslookup:*)",
+      "Bash(npm run build:check:*)",
+      "Bash(npm run dev:check:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

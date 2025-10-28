@@ -17,7 +17,7 @@
   } from '../../lib/stores/expenses';
   import { budgetStore, budgetCategoriesStore } from '../../lib/stores/budget';
   import { expenseService } from '../../lib/services/expenseService';
-  import { budgetService, DEFAULT_CATEGORIES } from '../../lib/services/budgetService';
+  import { budgetService, DEFAULT_CATEGORIES, UNCATEGORIZED_CATEGORY } from '../../lib/services/budgetService';
   import { periodService } from '../../lib/services/periodService';
   import InlineCategorySelector from '../../lib/components/expense/InlineCategorySelector.svelte';
   import PeriodSelector from '$lib/components/dashboard/PeriodSelector.svelte';
@@ -197,7 +197,11 @@
           })
           .map(([id, data]: [string, any]) => {
             // Find default category info (case-insensitive match)
-            const defaultCat = DEFAULT_CATEGORIES?.find(c => c.id.toUpperCase() === id.toUpperCase());
+            // Check UNCATEGORIZED first, then DEFAULT_CATEGORIES
+            const defaultCat = id.toUpperCase() === 'UNCATEGORIZED'
+              ? UNCATEGORIZED_CATEGORY
+              : DEFAULT_CATEGORIES?.find(c => c.id.toUpperCase() === id.toUpperCase());
+
             return {
               id,
               // Use saved name/emoji if available, otherwise fallback to default

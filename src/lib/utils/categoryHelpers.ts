@@ -38,7 +38,8 @@ export function getCategoryIcon(category: string): string {
     'EDUCATION': '📚',
     'UTILITIES': '⚡',
     'SAVINGS': '💰',
-    'OTHER': '📦'
+    'OTHER': '📦',
+    'UNCATEGORIZED': '📦'
   };
   return icons[normalizedCategory] || '📦';
 }
@@ -47,7 +48,7 @@ export function getCategoryIcon(category: string): string {
  * Format category name to Indonesian
  */
 export function formatCategoryName(category: string): string {
-  if (!category) return 'Lainnya'; // Default name for undefined/null
+  if (!category) return 'Tanpa Kategori'; // Default name for undefined/null
   const normalizedCategory = category.toUpperCase();
   const names: Record<string, string> = {
     'FOOD': 'Makanan',
@@ -58,7 +59,8 @@ export function formatCategoryName(category: string): string {
     'EDUCATION': 'Pendidikan',
     'UTILITIES': 'Tagihan',
     'SAVINGS': 'Tabungan',
-    'OTHER': 'Lainnya'
+    'OTHER': 'Lainnya',
+    'UNCATEGORIZED': 'Tanpa Kategori'
   };
   return names[normalizedCategory] || category;
 }
