@@ -12,17 +12,18 @@ DuitTrack is a mobile-first web application for personal expense tracking and sm
 
 ## Documentation
 Comprehensive documentation is available in the `documentation/` directory:
-- 01_PROJECT_OVERVIEW.md
-- 02_TECHNICAL_ARCHITECTURE.md
-- 03_UX_DESIGN_PATTERNS.md
-- 04_DEVELOPMENT_ROADMAP.md
-- 05_IMPLEMENTATION_GUIDE.md
+- **README.md** - Documentation hub with navigation
+- **PROJECT_SUMMARY.md** - Complete project overview
+- **architecture/** - System design & architecture docs
+- **development/** - Firebase & state management guides
+- **guides/** - Deployment & optimization guides
 
 ## Deployment
-This project is configured for **Cloudflare Pages** deployment:
-- **Deployment Guide:** [CLOUDFLARE_DEPLOYMENT_GUIDE.md](./CLOUDFLARE_DEPLOYMENT_GUIDE.md)
+This project is deployed on **Cloudflare Pages**:
+- **Deployment Guide:** [documentation/guides/CLOUDFLARE_DEPLOYMENT_GUIDE.md](documentation/guides/CLOUDFLARE_DEPLOYMENT_GUIDE.md)
 - **Framework:** SvelteKit with `@sveltejs/adapter-cloudflare`
-- **Hosting:** Unlimited bandwidth, 200+ CDN locations, FREE forever!
+- **Hosting:** Unlimited bandwidth, 200+ CDN locations worldwide
+- **Status:** ✅ Production Ready
 
 ## Tech Stack
 - Vite

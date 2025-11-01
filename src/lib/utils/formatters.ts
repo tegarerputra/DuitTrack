@@ -87,7 +87,9 @@ export function getPlayfulCategoryIcon(category: string): string {
  * Format category name to Indonesian
  */
 export function formatCategoryName(category: string): string {
-  return CATEGORY_NAMES[category?.toUpperCase()] || category || 'Lainnya';
+  const upperCategory = category?.toUpperCase();
+  if (upperCategory === 'UNCATEGORIZED') return 'Tanpa Kategori';
+  return CATEGORY_NAMES[upperCategory] || category || 'Lainnya';
 }
 
 /**

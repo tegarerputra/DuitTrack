@@ -55,25 +55,17 @@ The DuitTrack Dashboard is the **main hub** of the application, completely redes
 ### **3. Main Content (Scrollable)**
 ```
 ┌─────────────────────────────────────┐
-│          💰 Add Expense             │ ← Primary CTA
-│         Tambah Pengeluaran          │
-├─────────────────────────────────────┤
-│    🕒 Recent Transactions (3)       │ ← Latest activity
+│    📅 Transaksi Hari Ini            │ ← Today's activity
+│    Total: Rp 72k (3 transaksi)     │
+│                                     │
 │    🍽️ Warteg Bahari    -Rp 15k     │
 │    🚗 Gojek            -Rp 25k     │
 │    🛍️ Indomaret        -Rp 32k     │
-│    [Lihat Semua Transaksi]         │
-├─────────────────────────────────────┤
-│   📊 Quick Stats (2 cards)         │ ← Key metrics
-│   │ Hari Ini     │ Total Periode │  │
-│   │ Rp 45k       │ Rp 2.5M       │  │
-├─────────────────────────────────────┤
-│   ⚠️ Categories Need Attention      │ ← Budget warnings
-│   🍽️ Makanan: 82% (warning)        │
-│   🚗 Transport: 112% (over)         │
-│   [Lihat Semua Budget]             │
+│    [Lihat Semua Transaksi 📋]      │
 └─────────────────────────────────────┘
 ```
+
+**Note**: Dashboard menggunakan simplified, minimalist design yang hanya menampilkan transaksi hari ini. Card "Categories Need Attention" telah dihapus untuk mengurangi complexity.
 
 ## 🎨 **Component Details**
 
@@ -107,15 +99,15 @@ interface AddExpenseCard {
 ```
 
 **Visual Design:**
-- **Green button**: `background: #10b981` dengan clean design
-- **Large icon & text**: 💰 + "Tambah Pengeluaran"
-- **Full-width button** dengan rounded corners (12px)
-- **Touch-friendly** dengan active scale animation dan subtle shadow
-- **Hover effect**: Slightly elevated dengan enhanced shadow
+- **Glassmorphism button** dengan gradient cyan-to-blue
+- **Icon circle + text**: + icon in glass circle + "Tambah Expense"
+- **Sticky bottom position** dengan scroll hide/show behavior
+- **Touch-friendly** dengan hover scale animation
+- **Responsive**: Center on mobile, right-bottom on desktop (1024px+)
 
-### **3. Recent Transactions**
+### **3. Transaksi Hari Ini Card**
 ```typescript
-interface RecentTransaction {
+interface TodayTransaction {
   id: string;
   description: string;        // "Warteg Bahari"
   category: string;          // "FOOD" → 🍽️
@@ -125,105 +117,190 @@ interface RecentTransaction {
 ```
 
 **Display Logic:**
-- **Show maximum 5** most recent transactions
-- **Category icons** mapping untuk visual recognition
-- **Smart date formatting**: "Hari ini", "Kemarin", "23 Dec"
-- **Amount formatting**: -{formatRupiah(amount)}
-- **Empty state**: 📝 "Belum ada transaksi"
+- **Show today's transactions only** (filtered by date)
+- **Subtitle shows total**: "Total: Rp 72k (3 transaksi)"
+- **Category name as title**: Uses `formatCategoryName()`
+- **Notes as subtitle**: Transaction description or '-'
+- **Category emoji**: Synced with budget page emoji
+- **Amount color**: Dark gray (not red) untuk consistency
+- **Empty state**: 🎉 "Belum ada pengeluaran hari ini!"
 
-### **4. Quick Stats Grid**
-```typescript
-interface QuickStats {
-  todaySpending: number;    // Rp 45.000
-  periodSpending: number;   // Rp 2.500.000 (totalSpent)
-}
-```
-
-**Layout:**
-- **2-column grid** dengan equal width
-- **White cards** dengan border styling
-- **Center-aligned** content
-- **Large amount display** untuk emphasis
-
-### **5. Categories Need Attention**
-```typescript
-interface BudgetWarning {
-  category: string;         // "FOOD"
-  categoryName: string;     // "Makanan"
-  percentage: number;       // 82
-  status: 'warning' | 'danger';
-  spent: number;
-  budget: number;
-}
-```
-
-**Display Logic:**
-- **Only show categories** dengan 80%+ usage
-- **Warning (80-99%)**: Yellow background + border
-- **Danger (100%+)**: Red background + border
-- **Empty state**: 🎉 "Semua budget terkendali!"
-- **Category icons**: Consistent dengan transaction display
+**Components Used:**
+- `FinancialHeroCard_Final.svelte` - Main budget overview card
+- `PeriodSelector.svelte` - Period selection dropdown
 
 ## 🔄 **Data Flow & State Management**
 
 ### **Reactive Data Sources**
 ```typescript
 // Main dashboard state
-let budgetData: any = null;           // From budgetStore
-let expenses: any[] = [];             // From expenseStore
-let recentTransactions: any[] = [];   // Computed from expenses
-let categoriesNeedAttention: any[] = []; // Computed from budgetData
+let budgetData: BudgetData | null = null;  // From Firebase
+let expenses: Expense[] = [];              // From Firebase
+let recentTransactions: Transaction[] = []; // Today's transactions only
 
-// Computed metrics (reactive)
-$: totalBudget = budgetData?.totalBudget || 0;
-$: totalSpent = budgetData?.totalSpent || 0;
-$: percentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-$: budgetStatus = getBudgetStatus(percentage);
+// Metrics state
+let metrics: DashboardMetrics = {
+  totalBudget: 0,
+  totalSpent: 0,
+  percentage: 0,
+  remaining: 0,
+  budgetStatus: 'safe',
+  todaySpending: 0
+};
+
+// Scroll behavior for floating button
+let showFloatingButton = true;
+let lastScrollY = 0;
+let scrollThreshold = SCROLL_CONFIG.THRESHOLD;
 ```
 
-### **Store Subscriptions**
+### **Period-based Data Loading**
 ```typescript
-// Real-time Firebase listeners
-$: budgetStore.subscribe((data) => {
-  if (data && data.month === currentPeriodId) {
-    budgetData = data;
-    calculateBudgetMetrics();
-  }
-});
+// Load data from Firebase based on selected period
+async function loadPeriodData() {
+  try {
+    // Load from Firebase using periodService
+    const periodData = await periodService.loadPeriodData(currentPeriodId);
 
-$: expenseStore.subscribe((data) => {
-  if (data && data.expenses) {
-    expenses = data.expenses;
+    // Set expenses
+    expenses = periodData.expenses;
+
+    // Set budget data
+    if (periodData.budget) {
+      budgetData = {
+        categories: periodData.budget.categories,
+        totalBudget: periodData.budget.totalBudget,
+        totalSpent: periodData.budget.totalSpent,
+        month: currentPeriodId
+      };
+    }
+
+    // Calculate metrics
+    calculateBudgetMetrics();
     calculateExpenseMetrics();
+  } catch (error) {
+    console.error('Error loading dashboard data:', error);
   }
-});
+}
 ```
 
 ### **Data Calculations**
 ```typescript
 function calculateBudgetMetrics() {
-  // Budget status determination
-  if (percentage >= 100) budgetStatus = 'danger';
-  else if (percentage >= 80) budgetStatus = 'warning';
-  else budgetStatus = 'safe';
+  if (!budgetData) return;
 
-  // Categories needing attention
-  categoriesNeedAttention = Object.entries(budgetData.categories)
-    .filter(([_, data]) => (data.spent / data.budget) * 100 >= 80)
-    .sort((a, b) => b.percentage - a.percentage);
+  const totalBudget = budgetData.totalBudget || 0;
+  const totalSpent = budgetData.totalSpent || 0;
+  const percentage = totalBudget > 0 ?
+    Math.min(100, (totalSpent / totalBudget) * 100) : 0;
+  const remaining = Math.max(0, totalBudget - totalSpent);
+
+  // Budget status using constants
+  let budgetStatus: BudgetStatus = 'safe';
+  if (percentage >= BUDGET_THRESHOLDS.DANGER) {
+    budgetStatus = 'danger';
+  } else if (percentage >= BUDGET_THRESHOLDS.WARNING) {
+    budgetStatus = 'warning';
+  }
+
+  // Update metrics
+  metrics = {
+    totalBudget,
+    totalSpent,
+    percentage,
+    remaining,
+    budgetStatus,
+    todaySpending: metrics.todaySpending
+  };
 }
 
 function calculateExpenseMetrics() {
-  // Recent transactions (5 latest)
-  recentTransactions = expenses
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 5);
+  if (!expenses.length) return;
 
-  // Today's spending calculation
+  // Get TODAY's transactions only
   const today = new Date();
-  todaySpending = expenses
-    .filter(expense => isSameDay(expense.date, today))
-    .reduce((sum, expense) => sum + expense.amount, 0);
+  const todayTransactions = expenses
+    .filter(expense => {
+      const expenseDate = timestampToDate(expense.date);
+      return expenseDate.toDateString() === today.toDateString();
+    })
+    .sort((a, b) => {
+      const dateA = timestampToDate(a.date);
+      const dateB = timestampToDate(b.date);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+  recentTransactions = todayTransactions as Transaction[];
+
+  // Calculate today's spending
+  const todaySpending = todayTransactions.reduce(
+    (sum, expense) => sum + (expense.amount || 0), 0
+  );
+
+  // Update metrics
+  metrics = { ...metrics, todaySpending };
+}
+
+// Helper to get category emoji from budget data
+function getCategoryEmoji(categoryId: string): string {
+  if (!budgetData?.categories) {
+    return getPlayfulCategoryIcon(categoryId);
+  }
+
+  const categoryData = budgetData.categories[categoryId];
+  if (categoryData?.emoji) {
+    return categoryData.emoji;
+  }
+
+  return getPlayfulCategoryIcon(categoryId);
+}
+```
+
+### **Scroll Behavior for Floating Button**
+```typescript
+function setupScrollListener(): (() => void) | null {
+  if (!browser) return null;
+
+  lastScrollY = window.scrollY;
+  let ticking = false;
+
+  function handleScrollThrottled() {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        handleScroll();
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }
+
+  function handleScroll() {
+    if (!browser) return;
+    const currentScrollY = window.scrollY;
+
+    if (Math.abs(currentScrollY - lastScrollY) < scrollThreshold) {
+      return;
+    }
+
+    // Show button when scrolling up or at top
+    if (currentScrollY < lastScrollY ||
+        currentScrollY < SCROLL_CONFIG.SHOW_SCROLL_THRESHOLD) {
+      showFloatingButton = true;
+    }
+    // Hide button when scrolling down
+    else if (currentScrollY > lastScrollY &&
+             currentScrollY > SCROLL_CONFIG.HIDE_SCROLL_THRESHOLD) {
+      showFloatingButton = false;
+    }
+
+    lastScrollY = currentScrollY;
+  }
+
+  window.addEventListener('scroll', handleScrollThrottled, { passive: true });
+
+  return () => {
+    window.removeEventListener('scroll', handleScrollThrottled);
+  };
 }
 ```
 
@@ -370,7 +447,49 @@ function navigateTo(path: string) {
 
 ---
 
+## 📝 **Recent Changes (November 2025)**
+
+### **✅ Dashboard Simplification & UX Improvements**
+1. **Removed "Categories Need Attention" Card**
+   - Eliminated complexity and cognitive load
+   - Focuses dashboard on essential information only
+   - Users can view budget details on dedicated Budget page
+   - Removed all related functions: `categoriesNeedAttention` state, calculation logic
+   - Cleaned up CSS: `.dashboard-category-card` and related styles
+
+2. **Enhanced "Transaksi Hari Ini" Card**
+   - Moved from "5 recent transactions" to "today's transactions only"
+   - Added subtitle with total and transaction count
+   - Improved data display: category name as title, notes as subtitle
+   - Synced category emoji with budget page for consistency
+   - Changed amount color from red to dark gray for minimalist aesthetic
+   - Text button "Lihat Semua Transaksi" left-aligned for consistency
+
+3. **Floating Button Scroll Behavior**
+   - Implemented auto-hide on scroll down (>200px)
+   - Auto-show on scroll up or at top (<100px)
+   - Throttling with `requestAnimationFrame` for smooth performance
+   - Responsive behavior: center on mobile, right-bottom on desktop
+   - Proper cleanup in `onDestroy` to prevent memory leaks
+
+4. **Icon Consistency**
+   - Created `getCategoryEmoji()` helper function
+   - Dashboard now uses same emoji as budget page
+   - Falls back to `getPlayfulCategoryIcon()` if no budget emoji found
+
+### **Removed Components & Functions**
+- ❌ `categoriesNeedAttention` state variable
+- ❌ Categories calculation logic in `calculateBudgetMetrics()`
+- ❌ `CategoryAttention` type import
+- ❌ `FintechCard`, `FintechButton`, `FintechProgress` component imports (unused)
+- ❌ `.dashboard-category-card` CSS styles (~40 lines)
+- ❌ "Add Expense CTA Card" (replaced with floating button)
+- ❌ "Quick Stats Grid" (simplified to single card)
+
+---
+
 **Architecture Status**: ✅ **PRODUCTION READY**
+**Last Updated**: November 1, 2025
 **Performance**: Optimized untuk Indonesian mobile networks
 **Accessibility**: WCAG 2.1 compliant dengan proper touch targets
 **Security**: Bank-grade data protection dengan Firebase integration

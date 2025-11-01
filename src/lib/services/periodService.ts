@@ -18,13 +18,22 @@ export interface PeriodData {
 }
 
 /**
+ * Cached period data with timestamp
+ */
+interface CachedPeriodData {
+  data: PeriodData;
+  timestamp: number;
+}
+
+/**
  * Period service that manages period-specific data loading
  */
 export class PeriodService {
   private static instance: PeriodService;
 
-  // Cache for period data
-  private periodCache: Map<string, PeriodData> = new Map();
+  // Cache for period data with TTL (5 minutes)
+  private periodCache: Map<string, CachedPeriodData> = new Map();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
   private constructor() {
     // Private constructor for singleton pattern
@@ -52,10 +61,18 @@ export class PeriodService {
     }
 
     try {
-      // Check cache first
+      // Check cache first and validate TTL
       if (useCache && this.periodCache.has(periodId)) {
-        console.log(`📦 Using cached data for period ${periodId}`);
-        return this.periodCache.get(periodId)!;
+        const cached = this.periodCache.get(periodId)!;
+        const isExpired = Date.now() - cached.timestamp > this.CACHE_TTL;
+
+        if (!isExpired) {
+          console.log(`📦 Using cached data for period ${periodId} (age: ${Math.round((Date.now() - cached.timestamp) / 1000)}s)`);
+          return cached.data;
+        } else {
+          console.log(`⏰ Cache expired for period ${periodId}, reloading...`);
+          this.periodCache.delete(periodId);
+        }
       }
 
       console.log(`🔄 Loading data for period ${periodId}...`);
@@ -78,8 +95,11 @@ export class PeriodService {
         totalBudget
       };
 
-      // Cache the data
-      this.periodCache.set(periodId, periodData);
+      // Cache the data with timestamp
+      this.periodCache.set(periodId, {
+        data: periodData,
+        timestamp: Date.now()
+      });
 
       console.log(`✅ Period data loaded: ${expenses.length} expenses, total spent: Rp ${totalSpent.toLocaleString('id-ID')}`);
 
@@ -120,7 +140,7 @@ export class PeriodService {
     try {
       // Import auth service
       const { authService } = await import('./authService');
-      const { getCurrentPeriodIdForResetDate } = await import('$lib/utils/dummyData');
+      const { getCurrentPeriodIdForResetDate } = await import('$lib/utils/periodUtils');
 
       // Get user profile to get reset date
       const user = await authService.getCurrentUser();

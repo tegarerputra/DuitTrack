@@ -480,6 +480,9 @@
       // 🔥 FIREBASE: Update category budget in Firestore
       await budgetService.updateCategoryBudget(currentPeriodId, categoryId, newBudget);
 
+      // Clear cache to ensure dashboard reloads fresh data
+      periodService.clearPeriodCache(currentPeriodId);
+
       console.log(`✅ Budget updated for ${categoryId}: ${formatCurrency(newBudget)}`);
     } catch (error) {
       console.error('❌ Error updating category budget:', error);
@@ -552,6 +555,9 @@
       // 4. Force refresh from server
       await loadBudgetDataFromFirebase(true);
 
+      // Clear cache to ensure dashboard reloads fresh data
+      periodService.clearPeriodCache(currentPeriodId);
+
       // 5. Show success message
       const message = expenseCount > 0
         ? `Kategori "${categoryName}" dihapus. ${expenseCount} transaksi dipindahkan ke "Tanpa Kategori"`
@@ -610,6 +616,9 @@
 
       // 🔥 FIREBASE: Add category to budget in Firestore with name and emoji
       await budgetService.addCategory(currentPeriodId, categoryData.id, categoryData.budget, categoryData.name, categoryData.emoji);
+
+      // Clear cache to ensure dashboard reloads fresh data
+      periodService.clearPeriodCache(currentPeriodId);
 
       console.log(`✅ Category added and saved to database: ${categoryData.name}`);
     } catch (error) {

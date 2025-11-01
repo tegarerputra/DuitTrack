@@ -24,7 +24,9 @@
   $: timeProgress = totalDays > 0 ? (daysPassed / totalDays) * 100 : 0;
 
   // Velocity calculation
-  $: velocity = hasBudget ? calculateSpendingVelocity(totalBudget, totalSpent) : null;
+  $: velocity = hasBudget && currentPeriod
+    ? calculateSpendingVelocity(totalBudget, totalSpent, currentPeriod.startDate, currentPeriod.endDate)
+    : null;
 
   // Daily Insights calculations
   $: remainingBudget = Math.max(0, totalBudget - totalSpent);
@@ -182,7 +184,7 @@
         <div class="insight-box">
           <span class="insight-icon">📊</span>
           <div class="insight-info">
-            <span class="insight-label">Rata-rata:</span>
+            <span class="insight-label">Expense rata-rata:</span>
             <span class="insight-value">{formatShortRupiah(dailyAvg)}/hari</span>
           </div>
         </div>
@@ -191,7 +193,7 @@
         <div class="insight-box">
           <span class="insight-icon">🎯</span>
           <div class="insight-info">
-            <span class="insight-label">Sisa budget:</span>
+            <span class="insight-label">Max. Pengeluaran:</span>
             <span class="insight-value">{formatShortRupiah(dailyAllowance)}/hari</span>
           </div>
         </div>

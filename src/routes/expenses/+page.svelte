@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { slide } from 'svelte/transition';
@@ -25,6 +26,7 @@
   import { selectedPeriodStore } from '$lib/stores/period';
   import { formatIDR, formatDate as formatDateUtil } from '$lib/utils/index';
   import { getCategoryIcon, formatCategoryName, setBudgetCategories } from '$lib/utils/categoryHelpers';
+  import { SCROLL_CONFIG } from '$lib/config/dashboard.config';
 
   // Skeleton Components
   import SkeletonHero from '$lib/components/skeleton/SkeletonHero.svelte';
@@ -49,18 +51,28 @@
   let activeExpenseId: string | null = null;
   let categoryDropdownOpen: Record<string, boolean> = {}; // Track dropdown state per expense ID
 
-  // Subscribe to shared period store for cross-page persistence
-  selectedPeriodStore.subscribe((value) => {
-    if (value && value !== currentPeriodId) {
-      currentPeriodId = value;
-      console.log('📅 Expenses: Period changed from store:', value);
-      // loadExpensesData will be triggered by the reactive statement
-    }
-  });
+  // Store unsubscribe functions for cleanup
+  let unsubscribers: Array<() => void> = [];
+
+  // Floating button scroll behavior
+  let showFloatingButton = true;
+  let lastScrollY = 0;
+  let scrollThreshold = SCROLL_CONFIG.THRESHOLD;
+  let scrollHandlerCleanup: (() => void) | null = null;
 
   onMount(async () => {
     // Import utility upfront
-    const { validatePeriodResetDate } = await import('$lib/utils/dummyData');
+    const { validatePeriodResetDate } = await import('$lib/utils/periodUtils');
+
+    // Subscribe to shared period store for cross-page persistence
+    const periodUnsub = selectedPeriodStore.subscribe((value) => {
+      if (value && value !== currentPeriodId) {
+        currentPeriodId = value;
+        console.log('📅 Expenses: Period changed from store:', value);
+        // loadExpensesData will be triggered by the reactive statement
+      }
+    });
+    unsubscribers.push(periodUnsub);
 
     // Check if there's a stored period in the shared store
     const storedPeriod = $selectedPeriodStore;
@@ -71,8 +83,8 @@
       console.log('📅 Expenses: Waiting for PeriodSelector to set period');
     }
 
-    // Subscribe to user profile
-    userProfileStore.subscribe(profile => {
+    // Subscribe to user profile with cleanup
+    const profileUnsub = userProfileStore.subscribe(profile => {
       if (profile) {
         userProfile = profile;
 
@@ -87,6 +99,7 @@
         }
       }
     });
+    unsubscribers.push(profileUnsub);
 
     // Get URL parameters
     selectedCategory = $page.url.searchParams.get('category') || '';
@@ -111,10 +124,34 @@
 
     document.addEventListener('click', handleClickOutside);
 
+    // Setup scroll listener for floating button
+    if (browser) {
+      scrollHandlerCleanup = setupScrollListener();
+    }
+
     // Cleanup
     return () => {
+      // Cleanup all subscriptions
+      unsubscribers.forEach(unsub => unsub());
+      unsubscribers = [];
+
+      // Cleanup click listener
       document.removeEventListener('click', handleClickOutside);
+
+      // Cleanup scroll listener
+      if (scrollHandlerCleanup) {
+        scrollHandlerCleanup();
+      }
+
+      console.log('🧹 Expenses: Cleaned up all subscriptions and listeners');
     };
+  });
+
+  onDestroy(() => {
+    // Additional cleanup in onDestroy as safety net
+    if (scrollHandlerCleanup) {
+      scrollHandlerCleanup();
+    }
   });
 
   // Period management is now handled by PeriodSelector component
@@ -370,6 +407,56 @@
   function getDayTotal(expenses: any[]): number {
     return expenses.reduce((total, expense) => total + expense.amount, 0);
   }
+
+  // Scroll behavior for floating button - following dashboard pattern
+  function setupScrollListener(): (() => void) | null {
+    if (!browser) return null;
+
+    // Set initial scroll position
+    lastScrollY = window.scrollY;
+
+    // Add scroll event listener with throttling
+    let ticking = false;
+
+    function handleScrollThrottled() {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }
+
+    function handleScroll() {
+      if (!browser) return;
+
+      const currentScrollY = window.scrollY;
+
+      // Only hide/show if we've scrolled past threshold
+      if (Math.abs(currentScrollY - lastScrollY) < scrollThreshold) {
+        return;
+      }
+
+      // Show button when scrolling up or at top
+      if (currentScrollY < lastScrollY || currentScrollY < SCROLL_CONFIG.SHOW_SCROLL_THRESHOLD) {
+        showFloatingButton = true;
+      }
+      // Hide button when scrolling down
+      else if (currentScrollY > lastScrollY && currentScrollY > SCROLL_CONFIG.HIDE_SCROLL_THRESHOLD) {
+        showFloatingButton = false;
+      }
+
+      lastScrollY = currentScrollY;
+    }
+
+    window.addEventListener('scroll', handleScrollThrottled, { passive: true });
+
+    // Return cleanup function
+    return () => {
+      window.removeEventListener('scroll', handleScrollThrottled);
+    };
+  }
 </script>
 
 <div class="expenses-page">
@@ -605,10 +692,22 @@
       {/if}
     </div>
 
-    <!-- Floating Add Button (Mobile) -->
-    <button class="floating-add-button" on:click={handleAddExpense}>
-      +
-    </button>
+    <!-- Sticky Bottom Add Expense Button - Following Dashboard Pattern -->
+    <div class="sticky-bottom-button" class:button-hidden={!showFloatingButton}>
+      <button
+        class="add-expense-button"
+        on:click={handleAddExpense}
+        type="button"
+        aria-label="Tambah pengeluaran baru"
+        title="Tambah Expense"
+      >
+        <div class="button-content">
+          <span class="add-icon" aria-hidden="true">+</span>
+          <span class="button-text">Tambah Expense</span>
+        </div>
+        <div class="button-glow" aria-hidden="true"></div>
+      </button>
+    </div>
     {/if}
   </div>
 
@@ -1355,42 +1454,113 @@
     transform: scale(0.95);
   }
 
-  /* Floating Add Button */
-  .floating-add-button {
+  /* Sticky Bottom Add Expense Button - Following Dashboard Pattern */
+  .sticky-bottom-button {
     position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    width: 56px;
-    height: 56px;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Hidden state - slide down and fade out */
+  .sticky-bottom-button.button-hidden {
+    transform: translateX(-50%) translateY(120px);
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .add-expense-button {
+    position: relative;
+    padding: 12px 24px;
     background: linear-gradient(135deg,
-      rgba(0, 191, 255, 0.7) 0%,
-      rgba(30, 144, 255, 0.8) 100%);
-    backdrop-filter: blur(25px) saturate(1.8);
-    -webkit-backdrop-filter: blur(25px) saturate(1.8);
+      rgba(0, 191, 255, 0.55) 0%,
+      rgba(30, 144, 255, 0.65) 100%);
     border: 1px solid rgba(255, 255, 255, 0.4);
-    border-radius: 50%;
+    border-radius: 12px;
     color: white;
-    font-size: 1.5rem;
-    font-weight: 300;
+    font-weight: 600;
+    font-size: 14px;
     cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow:
       0 8px 32px rgba(0, 191, 255, 0.15),
       inset 0 1px 0 rgba(255, 255, 255, 0.5);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 100;
+    backdrop-filter: blur(25px) saturate(1.8);
+    -webkit-backdrop-filter: blur(25px) saturate(1.8);
+    pointer-events: all;
+    overflow: hidden;
   }
 
-  .floating-add-button:hover {
-    background: linear-gradient(135deg,
-      rgba(0, 191, 255, 0.85) 0%,
-      rgba(30, 144, 255, 0.9) 100%);
+  .add-expense-button:hover {
     transform: translateY(-3px) scale(1.03);
+    background: linear-gradient(135deg,
+      rgba(0, 191, 255, 0.7) 0%,
+      rgba(30, 144, 255, 0.8) 100%);
     box-shadow:
       0 12px 40px rgba(0, 191, 255, 0.2),
       inset 0 1px 0 rgba(255, 255, 255, 0.6);
     border-color: rgba(255, 255, 255, 0.6);
     backdrop-filter: blur(30px) saturate(2);
     -webkit-backdrop-filter: blur(30px) saturate(2);
+  }
+
+  .add-expense-button:active {
+    transform: translateY(-2px) scale(1.02);
+  }
+
+  .button-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .add-icon {
+    font-size: 24px;
+    font-weight: 300;
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+  }
+
+  .add-expense-button:hover .add-icon {
+    background: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: rotate(90deg);
+    backdrop-filter: blur(15px);
+  }
+
+  .button-text {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .button-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), transparent);
+    border-radius: 12px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .add-expense-button:hover .button-glow {
+    opacity: 1;
   }
 
   /* ===== ANIMATIONS ===== */
@@ -1630,9 +1800,18 @@
       min-height: 80px;
     }
 
-    .floating-add-button {
-      bottom: 1.5rem;
-      right: 1.5rem;
+    /* Mobile sticky button adjustments */
+    .sticky-bottom-button {
+      bottom: 24px;
+    }
+
+    .add-expense-button {
+      padding: 14px 28px;
+      font-size: 15px;
+    }
+
+    .button-text {
+      font-size: 15px;
     }
 
   }
@@ -1664,6 +1843,30 @@
       font-size: 24px;
     }
 
+    /* Extra small mobile sticky button adjustments */
+    .sticky-bottom-button {
+      bottom: 16px;
+    }
+
+    .sticky-bottom-button.button-hidden {
+      transform: translateX(-50%) translateY(100px);
+    }
+
+    .add-expense-button {
+      padding: 10px 20px;
+      font-size: 13px;
+    }
+
+    .button-text {
+      font-size: 13px;
+    }
+
+    .add-icon {
+      width: 24px;
+      height: 24px;
+      font-size: 16px;
+    }
+
   }
 
   /* Desktop and Tablet Layout */
@@ -1685,6 +1888,34 @@
       text-align: right;
       min-width: 200px;
       max-width: 280px;
+    }
+  }
+
+  /* Large Desktop */
+  @media (min-width: 1024px) {
+    .sticky-bottom-button {
+      bottom: 30px;
+      right: 30px;
+      left: auto;
+      transform: none;
+    }
+
+    .sticky-bottom-button.button-hidden {
+      transform: translateX(120px);
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .add-expense-button {
+      border-radius: 8px;
+      padding: 16px 32px;
+    }
+  }
+
+  /* Safe area for devices with notches */
+  @supports (padding: max(0px)) {
+    .sticky-bottom-button {
+      bottom: max(20px, env(safe-area-inset-bottom, 20px));
     }
   }
 

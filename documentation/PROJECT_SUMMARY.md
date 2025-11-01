@@ -104,6 +104,43 @@ Main Content (Scrollable)
 
 ---
 
+## 🎨 **Recent UX Improvements (November 2025)**
+
+### **Category Tile Selector - Add Expense Page**
+
+**Problem Solved**: Dropdown untuk category selection tidak intuitif di mobile dan tidak memberikan visual feedback tentang budget status.
+
+**Solution Implemented**:
+- **Tile-based UI**: Mengganti dropdown dengan visual button tiles (3-column grid layout)
+- **Budget Visualization**: Setiap tile menampilkan "Sisa: Rp XXX" untuk budget remaining
+- **Smart Categorization**:
+  - Hanya menampilkan kategori dengan budget allocation
+  - Empty selection otomatis → UNCATEGORIZED
+  - No need untuk "Tanpa Kategori" tile (explained via helper text)
+- **Enhanced Input**: Notes field menggunakan textarea (bukan single-line input) untuk detail panjang
+- **Simplified Actions**: Remove cancel button (close button di header sudah cukup)
+
+**Technical Implementation**:
+```
+Component: CategoryTileSelector.svelte
+Features:
+- 3-column grid (all screen sizes, termasuk mobile)
+- Real-time budget data dari budgetStore
+- Keyboard navigation (Arrow keys, Home, End)
+- ARIA accessibility attributes
+- Loading skeleton states
+- Deselectable tiles (click again to unselect)
+```
+
+**UX Benefits**:
+- ✅ **Faster category selection**: Visual scan vs dropdown scroll
+- ✅ **Budget awareness**: User melihat sisa budget sebelum input amount
+- ✅ **Mobile-optimized**: Large touch targets (44px minimum)
+- ✅ **Progressive disclosure**: Helper text explains optional behavior
+- ✅ **Clean UI**: Removed redundant cancel button
+
+---
+
 ## ⚡ **Performance Metrics**
 
 ### **Bundle Optimization**
@@ -154,6 +191,7 @@ Main Content (Scrollable)
 - **Data Layer**: Firebase stores dengan real-time sync
 - **Performance**: Optimized bundles, PWA-ready
 - **Documentation**: Comprehensive architecture docs
+- **Add Expense UX**: Category tile selector dengan budget visualization (November 2025)
 
 ### **🔄 In Progress (Phase 3)**
 - Chart.js integration untuk visual analytics
@@ -239,6 +277,7 @@ Main Content (Scrollable)
 - ✅ **<30s Expense Entry** (3-tap rule compliant)
 - ✅ **Real-time Budget Updates**
 - ✅ **Mobile-First Design** (430px optimized)
+- ✅ **Intuitive Category Selection** (Tile-based UI with budget info)
 
 ### **Development Quality**
 - ✅ **85.7% Migration Success Rate**
@@ -272,7 +311,12 @@ Main Content (Scrollable)
 
 ---
 
-**Last Updated**: December 30, 2025
+**Last Updated**: November 1, 2025
+**Recent Updates**:
+- ✅ Category Tile Selector implementation (Add Expense UX improvement)
+- ✅ Textarea for notes field (better for long descriptions)
+- ✅ Simplified action buttons (removed redundant cancel)
+
 **Status**: ✅ **Phase 2 Complete - Production Ready**
 **Next Milestone**: Phase 3 - Advanced Analytics & Charts
 

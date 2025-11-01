@@ -219,12 +219,13 @@ export function getPeriodById(config: PeriodGeneratorConfig, periodId: string): 
 
 /**
  * Calculate days remaining in current period
+ * Uses Math.floor for conservative budget calculation (prevents over-spending)
  */
 export function getDaysRemainingInPeriod(period: Period): number {
   const now = new Date();
   const end = new Date(period.endDate);
   const diffTime = end.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   return Math.max(0, diffDays);
 }
 

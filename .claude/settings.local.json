@@ -18,7 +18,16 @@
       "Bash(nslookup:*)",
       "Bash(npm run build:check:*)",
       "Bash(npm run dev:check:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(cat:*)",
+      "Bash(awk:*)",
+      "Bash(mkdir:*)",
+      "Bash(tree:*)",
+      "Bash(ls:*)",
+      "Bash(taskkill:*)",
+      "Bash(taskkill /F /PID 24168)"
     ],
     "deny": [],
     "ask": []

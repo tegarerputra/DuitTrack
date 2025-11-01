@@ -339,52 +339,12 @@ export const budgetActions = {
     });
   },
 
-  // Load budget data (using centralized dummy data)
+  // DEPRECATED: Load budget data (no longer used - data loaded via periodService)
+  // This function is kept for backward compatibility but should not be called
   loadBudgetData: async (periodId?: string) => {
-    budgetLoadingStore.set(true);
-    budgetErrorStore.set(null);
-
-    // Dynamically import dummy data to ensure latest version
-    const { getDummyBudgetData, generateDummyExpenses } = await import('../utils/dummyData');
-
-    // Generate expenses to calculate spending
-    const expenses = generateDummyExpenses(25);
-
-    // Calculate spending per category from actual expenses
-    const categorySpending: Record<string, number> = {};
-    expenses.forEach((expense: any) => {
-      const categoryId = expense.category.toLowerCase();
-      categorySpending[categoryId] = (categorySpending[categoryId] || 0) + expense.amount;
-    });
-
-    // Get budget data with real spending
-    const budgetDummyData = getDummyBudgetData();
-
-    // Update categories with REAL spending from expenses
-    const categoriesWithSpending: Record<string, CategoryBudget> = {};
-    Object.entries(budgetDummyData.categories).forEach(([catId, catData]: [string, any]) => {
-      categoriesWithSpending[catId] = {
-        budget: catData.budget,
-        spent: categorySpending[catId] || 0
-      };
-    });
-
-    const totalSpent = Object.values(categoriesWithSpending).reduce((sum, cat) => sum + cat.spent, 0);
-
-    // Simulate loading delay
-    setTimeout(() => {
-      const mockBudget: Budget = {
-        id: `budget_${periodId || getCurrentMonth()}`,
-        month: periodId || getCurrentMonth(),
-        categories: categoriesWithSpending,
-        totalBudget: budgetDummyData.totalBudget,
-        totalSpent: totalSpent,
-        userId: 'current_user'
-      };
-
-      currentBudgetStore.set(mockBudget);
-      budgetLoadingStore.set(false);
-    }, 1000);
+    console.warn('⚠️ loadBudgetData is deprecated. Use periodService.loadPeriodData() instead.');
+    budgetLoadingStore.set(false);
+    budgetErrorStore.set('This function is deprecated. Budget data is now loaded via periodService.');
   }
 };
 

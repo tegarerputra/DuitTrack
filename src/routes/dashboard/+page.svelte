@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
+  import { afterNavigate } from '$app/navigation';
   import { authStore, userStore, userProfileStore } from '$stores/auth';
   import { budgetStore } from '$stores/budget';
   import { expenseStore } from '$stores/expenses';
@@ -33,15 +34,11 @@
     BudgetData,
     Expense,
     Transaction,
-    CategoryAttention,
     DashboardMetrics
   } from '$lib/types/dashboard.types';
 
   // Components
   import AuthGuard from '$components/auth/AuthGuard.svelte';
-  import FintechCard from '$lib/components/ui/FintechCard.svelte';
-  import FintechButton from '$lib/components/ui/FintechButton.svelte';
-  import FintechProgress from '$lib/components/ui/FintechProgress.svelte';
   import FinancialHeroCard from '$lib/components/dashboard/FinancialHeroCard_Final.svelte';
   import PeriodSelector from '$lib/components/dashboard/PeriodSelector.svelte';
 
@@ -56,13 +53,8 @@
   let userProfile: UserProfile | null = null;
   let currentPeriodId = '';
 
-  // Subscribe to shared period store
-  selectedPeriodStore.subscribe((value) => {
-    if (value && value !== currentPeriodId) {
-      currentPeriodId = value;
-      console.log('📅 Dashboard: Period changed from store:', value);
-    }
-  });
+  // Store unsubscribe functions for cleanup
+  let unsubscribers: Array<() => void> = [];
 
   // Dual-mode support
   let hasBudgetSetup = false;
@@ -83,13 +75,16 @@
     budgetStatus: 'safe',
     todaySpending: 0
   };
-  let categoriesNeedAttention: CategoryAttention[] = [];
 
   // Floating button scroll behavior
   let showFloatingButton = true;
   let lastScrollY = 0;
   let scrollThreshold = SCROLL_CONFIG.THRESHOLD;
   let scrollHandlerCleanup: (() => void) | null = null;
+
+  // Debouncing for reactive data loading
+  let loadDataTimeout: ReturnType<typeof setTimeout> | null = null;
+  let currentLoadingPeriod: string = '';
 
   $: if (currentPeriodId && userProfile) {
     // Update currentPeriod object from periodId
@@ -98,17 +93,34 @@
       resetType: 'fixed' as const
     };
     currentPeriod = getPeriodById(config, currentPeriodId);
-    loadDashboardData();
+
+    // Debounce data loading to prevent race conditions
+    if (loadDataTimeout) {
+      clearTimeout(loadDataTimeout);
+    }
+
+    loadDataTimeout = setTimeout(() => {
+      // Only load if period actually changed
+      if (currentPeriodId !== currentLoadingPeriod) {
+        currentLoadingPeriod = currentPeriodId;
+        loadDashboardData();
+      }
+    }, 150); // 150ms debounce
   }
 
-  // Note: Using dummy data instead of budget store
 
-  $: expenseStore.subscribe((data) => {
-    if (data && data.expenses && data.currentPeriod === currentPeriodId) {
-      expenses = data.expenses;
-      calculateExpenseMetrics();
-      loading = false;
+  // Removed reactive subscription - will be handled in onMount
+
+  // Track if this is initial mount or navigation back
+  let isInitialMount = true;
+
+  // Handle navigation - reload data when navigating back to dashboard
+  afterNavigate((navigation) => {
+    if (!isInitialMount && currentPeriodId && userProfile) {
+      console.log('🔄 Navigated back to dashboard, force reloading data...');
+      loadDashboardData(true); // Force reload
     }
+    isInitialMount = false;
   });
 
   onMount(() => {
@@ -119,18 +131,39 @@
   });
 
   onDestroy(() => {
-    // Proper cleanup for scroll listener
+    // Cleanup all subscriptions
+    unsubscribers.forEach(unsub => unsub());
+    unsubscribers = [];
+
+    // Cleanup debounce timeout
+    if (loadDataTimeout) {
+      clearTimeout(loadDataTimeout);
+    }
+
+    // Cleanup scroll listener
     if (scrollHandlerCleanup) {
       scrollHandlerCleanup();
     }
+
+    console.log('🧹 Dashboard: Cleaned up all subscriptions and listeners');
   });
 
   async function initializeDashboard() {
     try {
       // Import utility upfront
-      const { validatePeriodResetDate } = await import('$lib/utils/dummyData');
+      const { validatePeriodResetDate } = await import('$lib/utils/periodUtils');
 
-      userProfileStore.subscribe((profile) => {
+      // Subscribe to period store with cleanup
+      const periodUnsub = selectedPeriodStore.subscribe((value) => {
+        if (value && value !== currentPeriodId) {
+          currentPeriodId = value;
+          console.log('📅 Dashboard: Period changed from store:', value);
+        }
+      });
+      unsubscribers.push(periodUnsub);
+
+      // Subscribe to user profile with cleanup
+      const profileUnsub = userProfileStore.subscribe((profile) => {
         if (profile) {
           userProfile = profile;
 
@@ -150,18 +183,23 @@
           console.log('📅 Dashboard: Waiting for PeriodSelector to set period');
         }
       });
+      unsubscribers.push(profileUnsub);
 
-      authStore.subscribe((isAuthenticated) => {
+      // Subscribe to auth store with cleanup
+      const authUnsub = authStore.subscribe((isAuthenticated) => {
         if (!isAuthenticated && browser) {
           goto('/');
         }
       });
+      unsubscribers.push(authUnsub);
 
-      userStore.subscribe((userData) => {
+      // Subscribe to user store with cleanup
+      const userUnsub = userStore.subscribe((userData) => {
         if (userData) {
           user = userData;
         }
       });
+      unsubscribers.push(userUnsub);
 
     } catch (err) {
       console.error('Dashboard initialization error:', err);
@@ -171,26 +209,26 @@
 
   // ✅ REMOVED: Unused period functions - period logic now handled by PeriodSelector component
 
-  async function loadDashboardData() {
+  async function loadDashboardData(forceReload: boolean = false) {
     try {
       loading = true;
 
-      // TEMPORARY: Load dummy data for development
-      loadDummyData();
+      // Force reload if requested (e.g., when returning from another page)
+      if (forceReload) {
+        console.log('🔄 Force reloading dashboard data...');
+        periodService.clearPeriodCache(currentPeriodId);
+      }
 
-      // DISABLED: Using dummy data instead of budget store mock
-      // if (budgetStore && typeof budgetStore.loadBudgetData === 'function') {
-      //   await budgetStore.loadBudgetData(currentPeriodId);
-      // }
-
-      // Note: expenseStore loading will be implemented when needed
+      // Load real data from Firebase
+      await loadPeriodData();
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      loading = false;
     }
   }
 
-  async function loadDummyData() {
+  async function loadPeriodData() {
     try {
       // 🔥 FIREBASE: Load period data from Firestore
       const periodData = await periodService.loadPeriodData(currentPeriodId);
@@ -269,26 +307,6 @@
       budgetStatus,
       todaySpending: metrics.todaySpending
     };
-
-    // Calculate categories that need attention
-    categoriesNeedAttention = [];
-    if (budgetData.categories) {
-      Object.entries(budgetData.categories).forEach(([category, data]: [string, any]) => {
-        const categoryPercentage = data.budget > 0 ? (data.spent / data.budget) * 100 : 0;
-        if (categoryPercentage >= BUDGET_THRESHOLDS.WARNING) {
-          categoriesNeedAttention.push({
-            category,
-            percentage: categoryPercentage,
-            spent: data.spent,
-            budget: data.budget,
-            status: categoryPercentage >= BUDGET_THRESHOLDS.DANGER ? 'danger' : 'warning'
-          });
-        }
-      });
-
-      // Sort by percentage (highest first)
-      categoriesNeedAttention.sort((a, b) => b.percentage - a.percentage);
-    }
   }
 
   function calculateExpenseMetrics() {
@@ -317,7 +335,21 @@
   }
 
 
-  // ✅ REMOVED: Unused helper functions - never called in the code
+  // Helper function to get category emoji from budget data
+  function getCategoryEmoji(categoryId: string): string {
+    if (!budgetData?.categories) {
+      return getPlayfulCategoryIcon(categoryId);
+    }
+
+    // Try to find emoji from budget categories
+    const categoryData = budgetData.categories[categoryId];
+    if (categoryData?.emoji) {
+      return categoryData.emoji;
+    }
+
+    // Fallback to playful icon
+    return getPlayfulCategoryIcon(categoryId);
+  }
 
   // Scroll behavior for floating button - improved with proper cleanup
   function setupScrollListener(): (() => void) | null {
@@ -458,13 +490,9 @@
                   <span class="transactions-icon">📅</span>
                   Transaksi Hari Ini
                 </h3>
-              </div>
-
-              <!-- Total Today Spending - Highlighted Box -->
-              <div class="today-total-box">
-                <div class="today-total-label">Total:</div>
-                <div class="today-total-value">{formatRupiah(metrics.todaySpending)}</div>
-                <div class="today-total-count">({recentTransactions.length} transaksi)</div>
+                <p class="transactions-subtitle">
+                  Total: {formatRupiah(metrics.todaySpending)} ({recentTransactions.length} transaksi)
+                </p>
               </div>
 
               {#if recentTransactions.length === 0}
@@ -479,14 +507,14 @@
                   {@const transactionDate = timestampToDate(transaction.date)}
                   <div class="transaction-item">
                     <div class="transaction-icon">
-                      {getPlayfulCategoryIcon(transaction.category)}
+                      {getCategoryEmoji(transaction.category)}
                     </div>
                     <div class="transaction-details">
                       <div class="transaction-description">
-                        {transaction.description || getPlayfulCategoryMessage(transaction.category)}
+                        {formatCategoryName(transaction.category)}
                       </div>
                       <div class="transaction-date">
-                        {formatDate(transactionDate)}
+                        {transaction.description || '-'}
                       </div>
                     </div>
                     <div class="transaction-amount">
@@ -505,73 +533,6 @@
             {/if}
             </div>
 
-            <!-- Categories Need Attention -->
-            <FintechCard
-              variant={categoriesNeedAttention.length > 0 ? "warning" : (hasBudgetSetup ? "success" : "info")}
-              size="md"
-              interactive={false}
-              className="fintech-fade-in dashboard-category-card"
-            >
-              <h3 class="text-lg font-semibold fintech-text-primary mb-4">
-                {#if categoriesNeedAttention.length > 0}
-                  ⚠️ Ada yang perlu diperhatikan nih!
-                {:else if !hasBudgetSetup}
-                  💡 Yuk, Mulai Setup Budget!
-                {:else}
-                  🎉 Semua budget terkendali!
-                {/if}
-              </h3>
-
-              {#if categoriesNeedAttention.length === 0}
-                {#if !hasBudgetSetup}
-                  <!-- Empty state when budget is not set up -->
-                  <div class="text-center py-6">
-                    <div class="text-4xl mb-2">💡</div>
-                    <p class="text-sm fintech-text-secondary">Belum ada kategori budget yang disetup</p>
-                    <p class="text-xs fintech-text-tertiary mt-1">Mulai atur budget untuk tracking pengeluaran yang lebih baik</p>
-                  </div>
-                {:else}
-                  <!-- Success state when all budgets are under control -->
-                  <div class="text-center py-6">
-                    <div class="text-4xl mb-2">🎉</div>
-                    <p class="text-sm fintech-text-secondary">Semua budget terkendali!</p>
-                    <p class="text-xs fintech-text-tertiary mt-1">Keren banget nih! 👏</p>
-                  </div>
-                {/if}
-            {:else}
-              <div class="space-y-2">
-                {#each categoriesNeedAttention as category, index}
-                  <div class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-all duration-200"
-                       class:bg-red-50={category.status === 'danger'}
-                       class:bg-yellow-50={category.status === 'warning'}>
-                    <div class="flex items-center gap-3">
-                      <span class="text-lg">{getPlayfulCategoryIcon(category.category)}</span>
-                      <span class="font-medium fintech-text-primary">
-                        {formatCategoryName(category.category)}
-                      </span>
-                    </div>
-                    <div class="text-right">
-                      <div class="font-bold fintech-text-primary fintech-amount-small">
-                        {category.percentage.toFixed(0)}%
-                      </div>
-                      <div class="text-xs fintech-text-tertiary">
-                        {category.status === 'danger' ? 'Kebablasan! 😱' : 'Hati-hati! 👀'}
-                      </div>
-                    </div>
-                  </div>
-                {/each}
-
-                <FintechButton
-                  variant="primary"
-                  fullWidth={true}
-                  className="mt-3"
-                  on:click={() => goto('/budget')}
-                >
-                  Lihat Semua Budget 💰
-                </FintechButton>
-              </div>
-            {/if}
-            </FintechCard>
           {/if}
 
         </div>
@@ -897,9 +858,6 @@
   }
 
   .transactions-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 20px;
   }
 
@@ -910,53 +868,19 @@
     font-size: 18px;
     font-weight: 700;
     color: #1f2937;
-    margin: 0;
+    margin: 0 0 8px 0;
   }
 
   .transactions-icon {
     font-size: 20px;
   }
 
-  .transactions-count {
-    font-size: 14px;
-    color: #6b7280;
-    font-weight: 500;
-  }
-
-  /* Today Total Box - Highlighted */
-  .today-total-box {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 16px;
-    background: rgba(6, 182, 212, 0.1);
-    backdrop-filter: blur(10px);
-    border-radius: 12px;
-    border: 1px solid rgba(6, 182, 212, 0.2);
-    margin-bottom: 20px;
-    box-shadow: 0 2px 8px rgba(6, 182, 212, 0.05);
-  }
-
-  .today-total-label {
+  .transactions-subtitle {
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 400;
     color: #6b7280;
-  }
-
-  .today-total-value {
-    flex: 1;
-    font-size: 20px;
-    font-weight: 800;
-    color: #0891B2;
-    text-align: right;
-  }
-
-  .today-total-count {
-    font-size: 12px;
-    font-weight: 500;
-    color: #6b7280;
-    white-space: nowrap;
+    margin: 0;
+    line-height: 1.5;
   }
 
   /* Empty State */
@@ -1024,35 +948,34 @@
   }
 
   .transaction-amount {
-    font-weight: 700;
-    color: #EF4444;
+    font-weight: 600;
+    color: #1f2937;
     font-size: 14px;
   }
 
   .view-all-button {
     width: 100%;
-    padding: 12px;
-    background: linear-gradient(135deg,
-      rgba(0, 191, 255, 0.55) 0%,
-      rgba(30, 144, 255, 0.65) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    color: white;
-    font-weight: 600;
+    padding: 12px 0;
+    background: transparent;
+    border: none;
+    color: #0891B2;
+    font-weight: 500;
+    font-size: 14px;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    margin-top: 16px;
-    box-shadow: 0 4px 16px rgba(0, 191, 255, 0.12);
-    backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+    margin-top: 8px;
+    text-align: left;
+    letter-spacing: 0.01em;
   }
 
   .view-all-button:hover {
-    background: linear-gradient(135deg,
-      rgba(0, 191, 255, 0.7) 0%,
-      rgba(30, 144, 255, 0.8) 100%);
-    box-shadow: 0 8px 24px rgba(0, 191, 255, 0.18);
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.4);
+    color: #06B6D4;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .view-all-button:active {
+    color: #0E7490;
   }
 
   /* Loading States */
@@ -1224,34 +1147,6 @@
     color: #d1d5db;
     font-weight: 400;
     padding: 0 4px;
-  }
-
-  /* Dashboard Category Card Glassmorphism Override */
-  :global(.dashboard-category-card.fintech-card) {
-    background: linear-gradient(135deg,
-      rgba(255, 255, 255, 0.5) 0%,
-      rgba(240, 248, 255, 0.4) 50%,
-      rgba(248, 252, 255, 0.6) 100%) !important;
-    backdrop-filter: blur(25px) saturate(1.8) !important;
-    -webkit-backdrop-filter: blur(25px) saturate(1.8) !important;
-    border: 1px solid rgba(255, 255, 255, 0.7) !important;
-    box-shadow:
-      0 8px 32px rgba(0, 191, 255, 0.03),
-      inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-  }
-
-  :global(.dashboard-category-card.fintech-card:hover) {
-    background: linear-gradient(135deg,
-      rgba(240, 248, 255, 0.7) 0%,
-      rgba(248, 252, 255, 0.5) 50%,
-      rgba(245, 250, 255, 0.8) 100%) !important;
-    transform: translateY(-4px) !important;
-    box-shadow:
-      0 20px 40px rgba(0, 191, 255, 0.06),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-    border-color: rgba(0, 191, 255, 0.2) !important;
-    backdrop-filter: blur(30px) saturate(2) !important;
-    -webkit-backdrop-filter: blur(30px) saturate(2) !important;
   }
 
   /* Mobile Enhanced Background Accents */

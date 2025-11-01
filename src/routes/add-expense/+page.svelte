@@ -11,6 +11,7 @@
   import { periodService } from '../../lib/services/periodService';
   import { DataService } from '../../lib/services/dataService';
   import SmartWarning from '../../lib/components/expense/SmartWarning.svelte';
+  import CategoryTileSelector from '../../lib/components/expense/CategoryTileSelector.svelte';
 
   // Navigation context
   let returnPath = '';
@@ -34,10 +35,10 @@
   let dateValue: string = getCurrentDate();
   let dateInputKey = 0; // Key to force re-render
 
-  // Form data stores - Initialize with today's date
+  // Form data stores - Initialize with today's date and empty category
   const formData = writable({
     amount: '',
-    category: 'OTHER',
+    category: '',  // Empty = no category selected (will be saved as UNCATEGORIZED)
     description: '',
     date: getCurrentDate()
   });
@@ -84,11 +85,16 @@
   $: {
     if ($budgetStore && typeof $budgetStore === 'object' && $budgetStore.categories) {
       try {
-        categories = Object.entries($budgetStore.categories).map(([key, data]: [string, any]) => ({
-          value: key.toUpperCase(),
-          label: formatCategoryName(key),
-          disabled: false
-        }));
+        // Filter out UNCATEGORIZED - only show categories with budget allocation
+        categories = Object.entries($budgetStore.categories)
+          .filter(([key]) => key.toUpperCase() !== 'UNCATEGORIZED')
+          .map(([key, data]: [string, any]) => ({
+            value: key.toUpperCase(),
+            label: formatCategoryName(key),
+            disabled: false,
+            budget: data.budget || 0,
+            spent: data.spent || 0
+          }));
         isLoadingCategories = false;
       } catch (error) {
         console.error('Error processing budget categories:', error);
@@ -136,7 +142,7 @@
   // Watch for form changes to trigger smart validation
   $: {
     try {
-      if ($formData && $formData.amount && $formData.category !== 'OTHER') {
+      if ($formData && $formData.amount && $formData.category && $formData.category !== 'UNCATEGORIZED') {
         debounceSmartValidation();
       }
     } catch (error) {
@@ -228,6 +234,18 @@
     errors.update(errs => ({ ...errs, category: '' }));
   }
 
+  function handleCategoryTileChange(event: CustomEvent) {
+    const category = event.detail.category;
+    // Empty category = UNCATEGORIZED
+    const finalCategory = category === '' ? 'UNCATEGORIZED' : category;
+    formData.update(data => ({ ...data, category: finalCategory }));
+    errors.update(errs => ({ ...errs, category: '' }));
+  }
+
+  function handleSetupBudget() {
+    goto('/budget');
+  }
+
   function handleDescriptionInput(event: Event) {
     const target = event.target as HTMLInputElement;
     formData.update(data => ({ ...data, description: target.value }));
@@ -314,7 +332,7 @@
       const amount = parseCurrencyInput(data.amount);
       const category = data.category;
 
-      if (amount <= 0 || category === 'OTHER') {
+      if (amount <= 0 || !category || category === 'UNCATEGORIZED') {
         smartWarning.set({ show: false, type: '', data: {} });
         return;
       }
@@ -416,9 +434,12 @@
       const currentPeriodId = await periodService.getCurrentPeriodId();
 
       // 🔥 FIREBASE: Create expense in Firestore
+      // Empty category defaults to UNCATEGORIZED
+      const finalCategory = data.category === '' || !data.category ? 'UNCATEGORIZED' : data.category.toUpperCase();
+
       const expenseData = {
         amount,
-        category: data.category.toUpperCase(),
+        category: finalCategory,
         description: data.description,
         date: new Date(data.date),
         periodId: currentPeriodId
@@ -500,10 +521,6 @@
     }
   }
 
-  function handleCancel() {
-    handleReturn();
-  }
-
   function formatCategoryName(category: string): string {
     const names: Record<string, string> = {
       'FOOD': 'Makanan',
@@ -551,7 +568,7 @@
   <div class="page-header">
     <div class="header-content">
       <h1 class="page-title">Add Expense</h1>
-      <button class="close-button" on:click={handleCancel} aria-label="Close">
+      <button class="close-button" on:click={handleReturn} aria-label="Close">
         ✕
       </button>
     </div>
@@ -600,33 +617,18 @@
           {/if}
         </div>
 
-        <!-- Category Selection -->
+        <!-- Category Selection with Tiles -->
         <div class="form-group">
-          <label for="expenseCategory" class="form-label">Category *</label>
-          <div class="select-wrapper">
-            <select
-              id="expenseCategory"
-              class="glass-input category-select"
-              class:error-state={$errors.category}
-              value={$formData.category}
-              on:change={handleCategoryChange}
-              disabled={!hasCategories || isLoadingCategories}
-            >
-              {#if isLoadingCategories}
-                <option value="OTHER">Loading categories...</option>
-              {:else if hasCategories}
-                <option value="OTHER">Choose category</option>
-                {#each categories as category}
-                  {#if !category.disabled}
-                    <option value={category.value}>{category.label}</option>
-                  {/if}
-                {/each}
-              {:else}
-                <option value="OTHER">💡 Set up budget first to track by category</option>
-              {/if}
-            </select>
-            <div class="select-arrow">▼</div>
-          </div>
+          <div id="category-label" class="form-label">Category (Optional)</div>
+          <CategoryTileSelector
+            aria-labelledby="category-label"
+            selectedCategory={$formData.category}
+            {categories}
+            isLoading={isLoadingCategories}
+            showBudgetInfo={true}
+            on:categoryChange={handleCategoryTileChange}
+            on:setupBudget={handleSetupBudget}
+          />
           {#if $errors.category}
             <div class="field-error">{$errors.category}</div>
           {/if}
@@ -656,15 +658,15 @@
         <!-- Description Input -->
         <div class="form-group">
           <label for="expenseDescription" class="form-label">Notes (Optional)</label>
-          <input
-            type="text"
+          <textarea
             id="expenseDescription"
-            class="glass-input"
+            class="glass-input glass-textarea"
             class:error-state={$errors.description}
             placeholder="What did you spend on?"
             value={$formData.description}
             on:input={handleDescriptionInput}
-          />
+            rows="3"
+          ></textarea>
           {#if $errors.description}
             <div class="field-error">{$errors.description}</div>
           {/if}
@@ -679,12 +681,9 @@
 
         <!-- Form Actions -->
         <div class="form-actions">
-          <button type="button" class="btn-secondary" on:click={handleCancel}>
-            Cancel
-          </button>
           <button
             type="submit"
-            class="btn-primary"
+            class="btn-primary btn-primary-full"
             disabled={!$isFormValid || isSubmitting}
           >
             {#if isSubmitting}
@@ -727,12 +726,12 @@
     min-height: 100vh;
     position: relative;
     padding: 0;
-    /* Enhanced glassmorphism background with stronger accents */
+    /* White background with subtle cyan accents - matching dashboard */
     background:
-      radial-gradient(circle at 20% 80%, rgba(0, 191, 255, 0.15) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(30, 144, 255, 0.12) 0%, transparent 50%),
-      radial-gradient(circle at 40% 40%, rgba(0, 123, 255, 0.08) 0%, transparent 40%),
-      linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      radial-gradient(circle at 30% 20%, rgba(0, 191, 255, 0.06) 0%, transparent 40%),
+      radial-gradient(circle at 70% 80%, rgba(30, 144, 255, 0.05) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(0, 123, 255, 0.03) 0%, transparent 30%),
+      linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
     overflow: hidden;
   }
 
@@ -741,9 +740,9 @@
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     background-image:
-      radial-gradient(circle at 25% 25%, rgba(0, 191, 255, 0.18) 0%, transparent 35%),
-      radial-gradient(circle at 75% 75%, rgba(30, 144, 255, 0.15) 0%, transparent 35%),
-      radial-gradient(circle at 50% 10%, rgba(0, 123, 255, 0.12) 0%, transparent 30%);
+      radial-gradient(circle at 20% 30%, rgba(0, 191, 255, 0.05) 0%, transparent 25%),
+      radial-gradient(circle at 80% 70%, rgba(30, 144, 255, 0.04) 0%, transparent 25%),
+      radial-gradient(circle at 50% 10%, rgba(0, 123, 255, 0.03) 0%, transparent 20%);
     animation: float-accent 20s ease-in-out infinite;
     pointer-events: none;
     z-index: 0;
@@ -758,13 +757,13 @@
     width: 500px;
     height: 500px;
     background: radial-gradient(circle,
-      rgba(0, 191, 255, 0.2) 0%,
-      rgba(30, 144, 255, 0.15) 25%,
-      rgba(6, 182, 212, 0.1) 50%,
+      rgba(0, 191, 255, 0.08) 0%,
+      rgba(30, 144, 255, 0.06) 25%,
+      rgba(6, 182, 212, 0.04) 50%,
       transparent 70%);
     border-radius: 50%;
-    filter: blur(60px);
-    animation: pulse-glow 8s ease-in-out infinite;
+    filter: blur(80px);
+    animation: pulse-glow 10s ease-in-out infinite;
     pointer-events: none;
     z-index: 0;
   }
@@ -950,6 +949,13 @@
       inset 0 1px 2px rgba(255, 255, 255, 0.8);
   }
 
+  .glass-textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+    line-height: 1.5;
+  }
+
   .glass-input::placeholder {
     color: #9ca3af;
   }
@@ -991,46 +997,6 @@
     color: #0f172a;
   }
 
-  .select-wrapper {
-    position: relative;
-  }
-
-  .category-select {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    padding-right: 2.5rem;
-    cursor: pointer;
-    background: rgba(255, 255, 255, 0.6);
-    font-weight: 500;
-  }
-
-  .category-select:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    background: rgba(255, 255, 255, 0.4);
-  }
-
-  .category-select:focus {
-    background: rgba(255, 255, 255, 0.75);
-  }
-
-  .select-arrow {
-    position: absolute;
-    right: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #6b7280;
-    pointer-events: none;
-    font-size: 0.8rem;
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    will-change: transform;
-  }
-
-  .category-select:focus + .select-arrow {
-    transform: translateY(-50%) rotate(180deg);
-    color: #00BFFF;
-  }
 
   .date-input {
     font-family: inherit;
@@ -1075,8 +1041,11 @@
     margin-top: 0.5rem;
   }
 
-  .btn-secondary, .btn-primary {
-    flex: 1;
+  .btn-primary-full {
+    width: 100%;
+  }
+
+  .btn-primary {
     padding: 0.875rem 1.25rem;
     border-radius: 10px;
     font-weight: 600;
@@ -1088,34 +1057,6 @@
     justify-content: center;
     gap: 0.5rem;
     border: none;
-  }
-
-  .btn-secondary {
-    background: rgba(255, 255, 255, 0.4);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1.5px solid rgba(0, 191, 255, 0.3);
-    color: #00BFFF;
-    box-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.05),
-      inset 0 1px 2px rgba(255, 255, 255, 0.8);
-  }
-
-  .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.6);
-    border-color: rgba(0, 191, 255, 0.5);
-    color: #1E90FF;
-    transform: translateY(-1px);
-    box-shadow:
-      0 2px 6px rgba(0, 191, 255, 0.1),
-      inset 0 1px 2px rgba(255, 255, 255, 0.9);
-  }
-
-  .btn-secondary:active {
-    transform: translateY(0);
-  }
-
-  .btn-primary {
     /* Vibrant cyan gradient matching FintechButton */
     background: linear-gradient(135deg,
       #00BFFF 0%,
@@ -1236,6 +1177,22 @@
 
   /* Mobile responsiveness */
   @media (max-width: 768px) {
+    /* Enhanced mobile background accents - matching dashboard */
+    .add-expense-page {
+      background:
+        radial-gradient(circle at 30% 20%, rgba(0, 191, 255, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 70% 80%, rgba(30, 144, 255, 0.06) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(0, 123, 255, 0.04) 0%, transparent 30%),
+        linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
+    }
+
+    .add-expense-page::before {
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(0, 191, 255, 0.06) 0%, transparent 25%),
+        radial-gradient(circle at 80% 70%, rgba(30, 144, 255, 0.05) 0%, transparent 25%),
+        radial-gradient(circle at 50% 10%, rgba(0, 123, 255, 0.04) 0%, transparent 20%);
+    }
+
     .page-header {
       padding: 1rem 0 0.5rem 0;
       margin-bottom: 0.75rem;
@@ -1293,9 +1250,25 @@
       margin-top: 0.5rem;
     }
 
-    .btn-secondary, .btn-primary {
+    .btn-primary {
       padding: 0.875rem;
       font-size: 0.9375rem;
+    }
+  }
+
+  @media (max-width: 430px) {
+    /* Extra enhancement for small screens - matching dashboard */
+    .add-expense-page {
+      background:
+        radial-gradient(circle at 25% 25%, rgba(0, 191, 255, 0.1) 0%, transparent 35%),
+        radial-gradient(circle at 75% 75%, rgba(30, 144, 255, 0.08) 0%, transparent 35%),
+        linear-gradient(135deg, #ffffff 0%, #f6f9ff 100%);
+    }
+
+    .add-expense-page::before {
+      background-image:
+        radial-gradient(circle at 15% 40%, rgba(0, 191, 255, 0.08) 0%, transparent 20%),
+        radial-gradient(circle at 85% 60%, rgba(30, 144, 255, 0.06) 0%, transparent 20%);
     }
   }
 

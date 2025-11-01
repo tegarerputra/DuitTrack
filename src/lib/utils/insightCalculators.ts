@@ -16,20 +16,23 @@ import type {
  */
 export function calculateSpendingVelocity(
   totalBudget: number,
-  totalSpent: number
+  totalSpent: number,
+  periodStart?: Date,
+  periodEnd?: Date
 ): VelocityAnalysis {
-  const daysElapsed = calculateDaysElapsed();
-  const totalDays = calculateDaysInMonth();
+  const daysElapsed = periodStart ? calculateDaysElapsedInPeriod(periodStart) : calculateDaysElapsed();
+  const totalDays = (periodStart && periodEnd) ? calculateTotalDaysInPeriod(periodStart, periodEnd) : calculateDaysInMonth();
 
   const timeProgress = daysElapsed / totalDays;
   const spentProgress = totalBudget > 0 ? totalSpent / totalBudget : 0;
   const difference = spentProgress - timeProgress;
 
-  // Determine status
+  // Determine status with more sensitive threshold
+  // Conservative approach: any overspending is flagged
   let status: 'too-fast' | 'on-track' | 'slow' = 'on-track';
-  if (difference > 0.15) {
+  if (difference > 0.05) { // Changed from 0.15 to 0.05 (5% threshold)
     status = 'too-fast';
-  } else if (difference < -0.15) {
+  } else if (difference < -0.05) { // Changed from -0.15 to -0.05 (5% threshold)
     status = 'slow';
   }
 
@@ -219,14 +222,46 @@ export function compareCategorySpending(
 }
 
 /**
- * Helper: Calculate days elapsed in current month
+ * Helper: Calculate days elapsed in period (from period start to now)
+ */
+function calculateDaysElapsedInPeriod(periodStart: Date): number {
+  const now = new Date();
+  const start = new Date(periodStart);
+  start.setHours(0, 0, 0, 0);
+
+  const diffTime = now.getTime() - start.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  // Return at least 1 day to avoid division by zero
+  return Math.max(1, diffDays + 1); // +1 to include start day
+}
+
+/**
+ * Helper: Calculate total days in period
+ */
+function calculateTotalDaysInPeriod(periodStart: Date, periodEnd: Date): number {
+  const start = new Date(periodStart);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(periodEnd);
+  end.setHours(0, 0, 0, 0);
+
+  const diffTime = end.getTime() - start.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  // +1 to include both start and end days
+  return diffDays + 1;
+}
+
+/**
+ * Helper: Calculate days elapsed in current month (LEGACY - for backward compatibility)
  */
 function calculateDaysElapsed(): number {
   return Math.max(1, new Date().getDate());
 }
 
 /**
- * Helper: Calculate total days in current month
+ * Helper: Calculate total days in current month (LEGACY - for backward compatibility)
  */
 function calculateDaysInMonth(): number {
   const today = new Date();

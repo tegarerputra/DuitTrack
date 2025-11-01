@@ -8,54 +8,64 @@ Selamat datang di dokumentasi lengkap DuitTrack - aplikasi fintech mobile-first 
 
 ### **Untuk Developer Baru**
 1. Baca **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** untuk overview lengkap project
-2. Review **[TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md)** untuk tech stack details
-3. Pelajari **[FIREBASE_INTEGRATION.md](FIREBASE_INTEGRATION.md)** untuk Firebase setup & data flow
-4. Baca **[STATE_MANAGEMENT.md](STATE_MANAGEMENT.md)** untuk Svelte stores architecture
-5. Lihat **[DASHBOARD_ARCHITECTURE.md](DASHBOARD_ARCHITECTURE.md)** untuk component structure
+2. Review **[architecture/TECHNICAL_ARCHITECTURE.md](architecture/TECHNICAL_ARCHITECTURE.md)** untuk tech stack details
+3. Pelajari **[development/FIREBASE_INTEGRATION.md](development/FIREBASE_INTEGRATION.md)** untuk Firebase setup & data flow
+4. Baca **[development/STATE_MANAGEMENT.md](development/STATE_MANAGEMENT.md)** untuk Svelte stores architecture
+5. Lihat **[architecture/DASHBOARD_ARCHITECTURE.md](architecture/DASHBOARD_ARCHITECTURE.md)** untuk component structure
 
 ### **Untuk Designer**
-1. Mulai dengan **[UX_DESIGN_PATTERNS.md](UX_DESIGN_PATTERNS.md)** untuk design system
-2. Review **[USER_FLOW_ARCHITECTURE.md](USER_FLOW_ARCHITECTURE.md)** untuk user journeys
+1. Mulai dengan **[architecture/UX_DESIGN_PATTERNS.md](architecture/UX_DESIGN_PATTERNS.md)** untuk design system
+2. Review **[architecture/USER_FLOW_ARCHITECTURE.md](architecture/USER_FLOW_ARCHITECTURE.md)** untuk user journeys
 
-### **Untuk Product Manager**
-1. Baca **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** untuk current status
-2. Review **[PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)** untuk vision & features
+### **Untuk DevOps/Deployment**
+1. Baca **[guides/CLOUDFLARE_DEPLOYMENT_GUIDE.md](guides/CLOUDFLARE_DEPLOYMENT_GUIDE.md)** untuk production deployment
+2. Review **[guides/VITE_OPTIMIZATION_GUIDE.md](guides/VITE_OPTIMIZATION_GUIDE.md)** untuk build optimization
+
+---
+
+## 📂 **Documentation Structure**
+
+```
+documentation/
+├── README.md                           📍 You are here
+├── PROJECT_SUMMARY.md                  🌟 Comprehensive project overview
+│
+├── architecture/                       🏗️ Architecture & Design
+│   ├── TECHNICAL_ARCHITECTURE.md       - Tech stack & system design
+│   ├── DASHBOARD_ARCHITECTURE.md       - Dashboard component structure
+│   ├── USER_FLOW_ARCHITECTURE.md       - User journey mapping
+│   └── UX_DESIGN_PATTERNS.md          - Design system & UI patterns
+│
+├── development/                        💻 Development Guides
+│   ├── FIREBASE_INTEGRATION.md         - Firebase setup & data layer
+│   └── STATE_MANAGEMENT.md            - Svelte stores architecture
+│
+└── guides/                            📖 How-to Guides
+    ├── CLOUDFLARE_DEPLOYMENT_GUIDE.md  - Production deployment
+    └── VITE_OPTIMIZATION_GUIDE.md      - Build optimization
+```
 
 ---
 
 ## 📖 **Documentation Index**
 
-### **🎯 Essential Documentation**
+### 🌟 **Essential Documentation**
 
-#### **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** 🌟
-**Status**: ✅ Updated (Dec 2025)
+#### **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)**
 **Purpose**: Comprehensive project overview
 **Contains**:
 - Project vision & philosophy
 - Complete tech stack breakdown
 - Performance metrics & achievements
-- Migration success story
 - Current development status
 
 **Best for**: Quick project overview, onboarding new team members
 
 ---
 
-#### **[PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)**
-**Status**: ✅ Maintained
-**Purpose**: High-level project vision
-**Contains**:
-- Core purpose & target users
-- Key design principles
-- Feature overview
-- Design philosophy
+### 🏗️ **Architecture Documentation**
 
-**Best for**: Understanding project goals and user focus
-
----
-
-#### **[TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md)**
-**Status**: ✅ Maintained
+#### **[architecture/TECHNICAL_ARCHITECTURE.md](architecture/TECHNICAL_ARCHITECTURE.md)**
 **Purpose**: Deep-dive technical specifications
 **Contains**:
 - Complete tech stack (Svelte, Vite, Firebase)
@@ -66,47 +76,31 @@ Selamat datang di dokumentasi lengkap DuitTrack - aplikasi fintech mobile-first 
 
 **Best for**: Technical implementation, architecture decisions
 
----
-
-### **🔧 Developer Documentation**
-
-#### **[FIREBASE_INTEGRATION.md](FIREBASE_INTEGRATION.md)** 🆕
-**Status**: ✅ New
-**Purpose**: Firebase configuration & data layer guide
+#### **[architecture/DASHBOARD_ARCHITECTURE.md](architecture/DASHBOARD_ARCHITECTURE.md)**
+**Purpose**: Dashboard implementation guide
 **Contains**:
-- Firebase v9 modular SDK setup
-- Authentication implementation (Google OAuth)
-- Firestore database structure & collections
-- Real-time data synchronization patterns
-- Utility functions & helpers (currency, date formatting)
-- Security rules & best practices
-- Transaction management & batch operations
+- Simplified mobile-first design structure
+- Component breakdown (Budget Overview, CTA, Stats)
+- Data flow & state management
+- Performance optimizations
+- Responsive design patterns
+- Loading & empty states
 
-**Best for**: Backend integration, data operations, authentication flow
+**Best for**: Dashboard development, component implementation
 
----
-
-#### **[STATE_MANAGEMENT.md](STATE_MANAGEMENT.md)** 🆕
-**Status**: ✅ New
-**Purpose**: Svelte stores architecture guide
+#### **[architecture/USER_FLOW_ARCHITECTURE.md](architecture/USER_FLOW_ARCHITECTURE.md)**
+**Purpose**: Complete user journey mapping
 **Contains**:
-- Store organization & structure (`auth`, `budget`, `expenses`, `ui`, `navigation`)
-- Auth stores (authentication, user profile, session)
-- Budget stores (categories, analysis, summary)
-- Expense stores (filtering, sorting, aggregation)
-- Derived stores & computed values
-- Store actions & update patterns
-- Best practices & anti-patterns
-- Real-time Firebase synchronization
+- Core user journeys (first-time user, daily usage)
+- Page-by-page user flows
+- Smart navigation system
+- 3-tap rule compliance
+- State management flow
+- Error handling & recovery
 
-**Best for**: State management, reactive data flow, store implementation
+**Best for**: Understanding user experience, flow optimization
 
----
-
-### **🎨 Design & UX Documentation**
-
-#### **[UX_DESIGN_PATTERNS.md](UX_DESIGN_PATTERNS.md)**
-**Status**: ✅ Updated (Clean Card Design)
+#### **[architecture/UX_DESIGN_PATTERNS.md](architecture/UX_DESIGN_PATTERNS.md)**
 **Purpose**: Complete design system guide
 **Contains**:
 - Visual design system (clean white cards)
@@ -122,42 +116,52 @@ Selamat datang di dokumentasi lengkap DuitTrack - aplikasi fintech mobile-first 
 
 ---
 
-#### **[DASHBOARD_ARCHITECTURE.md](DASHBOARD_ARCHITECTURE.md)**
-**Status**: ✅ Updated (Phase 2 Complete)
-**Purpose**: Dashboard implementation guide
-**Contains**:
-- Simplified mobile-first design structure
-- Component breakdown (Budget Overview, CTA, Stats)
-- Data flow & state management
-- Performance optimizations
-- Responsive design patterns
-- Loading & empty states
+### 💻 **Development Documentation**
 
-**Best for**: Dashboard development, component implementation
+#### **[development/FIREBASE_INTEGRATION.md](development/FIREBASE_INTEGRATION.md)**
+**Purpose**: Firebase configuration & data layer guide
+**Contains**:
+- Firebase v9 modular SDK setup
+- Authentication implementation (Google OAuth)
+- Firestore database structure & collections
+- Real-time data synchronization patterns
+- Utility functions & helpers (currency, date formatting)
+- Security rules & best practices
+- Transaction management & batch operations
+
+**Best for**: Backend integration, data operations, authentication flow
+
+#### **[development/STATE_MANAGEMENT.md](development/STATE_MANAGEMENT.md)**
+**Purpose**: Svelte stores architecture guide
+**Contains**:
+- Store organization & structure (`auth`, `budget`, `expenses`, `ui`, `navigation`)
+- Auth stores (authentication, user profile, session)
+- Budget stores (categories, analysis, summary)
+- Expense stores (filtering, sorting, aggregation)
+- Derived stores & computed values
+- Store actions & update patterns
+- Best practices & anti-patterns
+- Real-time Firebase synchronization
+
+**Best for**: State management, reactive data flow, store implementation
 
 ---
 
-### **🔄 User Experience Documentation**
+### 📖 **How-to Guides**
 
-#### **[USER_FLOW_ARCHITECTURE.md](USER_FLOW_ARCHITECTURE.md)**
-**Status**: ✅ Maintained
-**Purpose**: Complete user journey mapping
+#### **[guides/CLOUDFLARE_DEPLOYMENT_GUIDE.md](guides/CLOUDFLARE_DEPLOYMENT_GUIDE.md)**
+**Purpose**: Production deployment guide
 **Contains**:
-- Core user journeys (first-time user, daily usage)
-- Page-by-page user flows
-- Smart navigation system
-- 3-tap rule compliance
-- State management flow
-- Error handling & recovery
+- Cloudflare Pages setup & configuration
+- Environment variables setup
+- Firebase domain authorization
+- Security headers configuration
+- Deployment troubleshooting
+- Custom domain setup
 
-**Best for**: Understanding user experience, flow optimization
-
----
-
-### **⚡ Performance & Optimization**
+**Best for**: Deploying to production, DevOps
 
 #### **[guides/VITE_OPTIMIZATION_GUIDE.md](guides/VITE_OPTIMIZATION_GUIDE.md)**
-**Status**: ✅ Maintained
 **Purpose**: Vite build optimization guide
 **Contains**:
 - Indonesia-specific performance optimizations
@@ -171,64 +175,79 @@ Selamat datang di dokumentasi lengkap DuitTrack - aplikasi fintech mobile-first 
 
 ---
 
-## 🏗️ **Project Structure Overview**
+## 🔍 **Finding What You Need**
 
-```
-DuitTrack/
-├── src/
-│   ├── lib/
-│   │   ├── components/          # 35+ Svelte components
-│   │   │   ├── auth/           # Google OAuth authentication
-│   │   │   ├── budget/         # Budget management
-│   │   │   ├── dashboard/      # Dashboard widgets
-│   │   │   ├── expense/        # Expense tracking
-│   │   │   ├── navigation/     # Navigation system
-│   │   │   └── ui/            # Reusable UI components
-│   │   ├── stores/            # Svelte stores (state management)
-│   │   │   ├── auth.ts        # Authentication state
-│   │   │   ├── budget.ts      # Budget management
-│   │   │   ├── expenses.ts    # Expense tracking
-│   │   │   ├── ui.ts          # UI state
-│   │   │   └── navigation.ts  # Navigation state
-│   │   ├── config/            # Firebase configuration
-│   │   │   └── firebase.ts    # Firebase v9 setup
-│   │   └── utils/             # Helper functions
-│   │       └── index.ts       # Currency, date, validation utils
-│   └── routes/                # SvelteKit file-based routing
-│       ├── +page.svelte               # Landing page
-│       ├── +layout.svelte             # Global layout
-│       ├── dashboard/+page.svelte     # Main dashboard
-│       ├── add-expense/+page.svelte   # Add expense form
-│       ├── expenses/+page.svelte      # Expense history
-│       └── onboarding/+page.svelte    # User onboarding
-├── static/                    # PWA assets, favicons
-├── documentation/             # 📚 You are here
-└── vite.config.js            # Vite optimization (9.2/10 rating)
-```
+### **"How do I...?"**
+
+**...understand the project vision?**
+→ [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)
+
+**...setup Firebase & database?**
+→ [development/FIREBASE_INTEGRATION.md](development/FIREBASE_INTEGRATION.md)
+
+**...manage application state?**
+→ [development/STATE_MANAGEMENT.md](development/STATE_MANAGEMENT.md)
+
+**...implement a new component?**
+→ [architecture/TECHNICAL_ARCHITECTURE.md](architecture/TECHNICAL_ARCHITECTURE.md) + [architecture/UX_DESIGN_PATTERNS.md](architecture/UX_DESIGN_PATTERNS.md)
+
+**...optimize performance?**
+→ [guides/VITE_OPTIMIZATION_GUIDE.md](guides/VITE_OPTIMIZATION_GUIDE.md)
+
+**...understand user flows?**
+→ [architecture/USER_FLOW_ARCHITECTURE.md](architecture/USER_FLOW_ARCHITECTURE.md)
+
+**...work on the dashboard?**
+→ [architecture/DASHBOARD_ARCHITECTURE.md](architecture/DASHBOARD_ARCHITECTURE.md)
+
+**...follow the design system?**
+→ [architecture/UX_DESIGN_PATTERNS.md](architecture/UX_DESIGN_PATTERNS.md)
+
+**...deploy to production?**
+→ [guides/CLOUDFLARE_DEPLOYMENT_GUIDE.md](guides/CLOUDFLARE_DEPLOYMENT_GUIDE.md)
+
+**...understand period utilities?**
+→ `src/lib/utils/periodUtils.ts` - Period validation & calculation helpers
+
+---
+
+## 🛠️ **Tech Stack Quick Reference**
+
+- **Frontend**: Svelte 4 + SvelteKit + TypeScript
+- **Build Tool**: Vite 5 (with Indonesian optimizations)
+- **Backend**: Firebase Auth + Firestore
+- **Styling**: TailwindCSS + Clean Card Design
+- **Deployment**: Cloudflare Pages (unlimited bandwidth)
+- **PWA**: Service Worker with intelligent caching
+- **State Management**: Svelte stores dengan real-time sync
 
 ---
 
 ## 🎯 **Current Project Status**
 
-### **✅ Phase 2 Complete (December 2025)**
-- Simplified dashboard with mobile-first design
-- Clean white card design system
-- Apple Music-style hamburger navigation
-- Real-time Firebase data integration
-- Production-ready performance (<500KB bundle)
+### **✅ Production Ready (November 2025)**
+- ✅ Flexible budget period tracking (customizable reset dates)
+- ✅ Simplified dashboard with mobile-first design
+- ✅ Clean white card design system
+- ✅ Real-time Firebase data integration
+- ✅ Production-ready performance (<500KB bundle)
+- ✅ Deployed on Cloudflare Pages
+- ✅ Comprehensive documentation
+- ✅ **NEW**: Category Tile Selector for better expense entry UX
 
-### **🔄 Phase 3 In Progress**
-- Chart.js integration for visual analytics
-- Enhanced expense filtering
-- Period selector functionality
-- Export features (PDF/CSV)
+### **🚀 Active Features**
+- Budget management with category tracking
+- Expense tracking with real-time updates
+- Period-based financial tracking
+- Smart insights and analytics
+- Google Sign-In authentication
+- PWA support with offline capabilities
 
 ---
 
 ## 📊 **Key Metrics & Achievements**
 
 ### **Technical Excellence**
-- ✅ **85.7% Migration Success** (Vanilla JS → Svelte)
 - ✅ **95+ Lighthouse Score**
 - ✅ **100% TypeScript Coverage**
 - ✅ **<500KB Bundle Size**
@@ -246,86 +265,38 @@ DuitTrack/
 
 ---
 
-## 🔍 **Finding What You Need**
-
-### **"How do I...?"**
-
-**...understand the project vision?**
-→ [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) atau [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)
-
-**...setup Firebase & database?** 🆕
-→ [FIREBASE_INTEGRATION.md](FIREBASE_INTEGRATION.md)
-
-**...manage application state?** 🆕
-→ [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md)
-
-**...implement a new component?**
-→ [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md) + [UX_DESIGN_PATTERNS.md](UX_DESIGN_PATTERNS.md)
-
-**...optimize performance?**
-→ [guides/VITE_OPTIMIZATION_GUIDE.md](guides/VITE_OPTIMIZATION_GUIDE.md)
-
-**...understand user flows?**
-→ [USER_FLOW_ARCHITECTURE.md](USER_FLOW_ARCHITECTURE.md)
-
-**...work on the dashboard?**
-→ [DASHBOARD_ARCHITECTURE.md](DASHBOARD_ARCHITECTURE.md)
-
-**...follow the design system?**
-→ [UX_DESIGN_PATTERNS.md](UX_DESIGN_PATTERNS.md)
-
----
-
-## 🛠️ **Tech Stack Quick Reference**
-
-- **Frontend**: Svelte 4 + SvelteKit + TypeScript
-- **Build Tool**: Vite 5 (with Indonesian optimizations)
-- **Backend**: Firebase Auth + Firestore
-- **Styling**: TailwindCSS + Clean Card Design
-- **Deployment**: Netlify (duittrack.farahtegar.com)
-- **PWA**: Service Worker with intelligent caching
-- **State Management**: Svelte stores dengan real-time sync
-
----
-
-## 📚 **Documentation Structure**
-
-### **Available Documentation**
-1. **[PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)** - High-level project vision
-2. **[TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md)** - Deep-dive tech specs
-3. **[FIREBASE_INTEGRATION.md](FIREBASE_INTEGRATION.md)** 🆕 - Firebase setup & data layer
-4. **[STATE_MANAGEMENT.md](STATE_MANAGEMENT.md)** 🆕 - Svelte stores architecture
-5. **[UX_DESIGN_PATTERNS.md](UX_DESIGN_PATTERNS.md)** - Design system guide
-6. **[USER_FLOW_ARCHITECTURE.md](USER_FLOW_ARCHITECTURE.md)** - User journey mapping
-7. **[DASHBOARD_ARCHITECTURE.md](DASHBOARD_ARCHITECTURE.md)** - Dashboard implementation
-8. **[guides/VITE_OPTIMIZATION_GUIDE.md](guides/VITE_OPTIMIZATION_GUIDE.md)** - Performance guide
-
----
-
 ## 📈 **Documentation Maintenance**
 
-### **Last Major Update**: December 30, 2025
+### **Last Major Update**: November 1, 2025
 
-### **Update History**
-- ✅ **Dec 2025**: Documentation consolidation & enhancement
-  - Removed 14 outdated files
-  - Updated design system (glassmorphism → clean cards)
-  - Merged redundant documentation
-  - Created README.md as central hub
-  - **Added** FIREBASE_INTEGRATION.md (new)
-  - **Added** STATE_MANAGEMENT.md (new)
-  - Renamed files (removed number prefixes)
-
-- ✅ **Sep 2025**: Dashboard redesign documentation
-- ✅ **Sep 2025**: Migration success reports
-- ✅ **Sep 2025**: Initial comprehensive documentation
+### **Recent Changes**
+- ✅ **Dashboard Simplification & UX Improvements** (November 1, 2025)
+  - Removed "Categories Need Attention" card to reduce complexity
+  - Enhanced "Transaksi Hari Ini" with minimalist design
+  - Implemented floating button scroll behavior (auto-hide on scroll)
+  - Synced category emoji between dashboard and budget pages
+  - Applied same floating button style to expenses page
+  - Cleaned up ~40 lines of unused CSS and functions
+  - Updated DASHBOARD_ARCHITECTURE.md with complete changes
+- ✅ **Category Tile Selector UX improvement** documented in PROJECT_SUMMARY.md
+  - Tile-based category selection (replacing dropdown)
+  - Budget visualization on each tile
+  - Textarea for notes input
+  - Simplified action buttons
+- ✅ **Reorganized documentation structure** with clear folders:
+  - `architecture/` - Design & system architecture
+  - `development/` - Developer guides
+  - `guides/` - How-to guides
+- ✅ **Updated README.md** with improved navigation
+- ✅ **Cleaned up 40+ outdated files**
+- ✅ **Verified all documentation is current**
 
 ### **Maintenance Guidelines**
 - Update PROJECT_SUMMARY.md untuk major project changes
 - Keep technical architecture current dengan codebase
 - Document new design patterns dalam UX guide
 - Update Firebase & State docs when data structure changes
-- Archive old reports, keep documentation lean
+- Keep documentation lean and focused
 
 ---
 
@@ -334,8 +305,12 @@ DuitTrack/
 ### **Before Adding New Docs**
 1. Check if existing docs can be updated instead
 2. Ensure content doesn't duplicate existing documentation
-3. Follow existing format and structure
-4. Update this README.md to reference new docs
+3. Choose appropriate folder:
+   - `architecture/` - Design & system architecture
+   - `development/` - Developer implementation guides
+   - `guides/` - Step-by-step how-to guides
+4. Follow existing format and structure
+5. Update this README.md to reference new docs
 
 ### **Documentation Standards**
 - Use Markdown format
@@ -343,26 +318,26 @@ DuitTrack/
 - Add code examples where helpful
 - Keep language simple and clear (Bahasa Indonesia OK)
 - Update "Last Updated" dates
+- Add emojis for better visual navigation (optional)
 
 ---
 
 ## 📞 **Support & Questions**
 
 ### **For Technical Questions**
-- Review [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md)
-- Check [FIREBASE_INTEGRATION.md](FIREBASE_INTEGRATION.md) for data layer
-- Check [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md) for stores
+- Review [architecture/TECHNICAL_ARCHITECTURE.md](architecture/TECHNICAL_ARCHITECTURE.md)
+- Check [development/FIREBASE_INTEGRATION.md](development/FIREBASE_INTEGRATION.md) for data layer
+- Check [development/STATE_MANAGEMENT.md](development/STATE_MANAGEMENT.md) for stores
 - Refer to Firebase & Svelte official docs
 
 ### **For Design Questions**
-- Review [UX_DESIGN_PATTERNS.md](UX_DESIGN_PATTERNS.md)
+- Review [architecture/UX_DESIGN_PATTERNS.md](architecture/UX_DESIGN_PATTERNS.md)
 - Check existing component implementations
 - Follow clean card design system
 
-### **For Product Questions**
-- Review [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)
-- Check user flow documentation
-- Refer to current project status
+### **For Deployment Questions**
+- Review [guides/CLOUDFLARE_DEPLOYMENT_GUIDE.md](guides/CLOUDFLARE_DEPLOYMENT_GUIDE.md)
+- Check Cloudflare Pages documentation
 
 ---
 
@@ -370,28 +345,28 @@ DuitTrack/
 
 - **Project Start**: 2024
 - **Migration to Svelte**: September 2025
-- **Current Phase**: Phase 2 Complete, Phase 3 In Progress
+- **Deployment Platform**: Cloudflare Pages
 - **Team Size**: Solo developer (with Claude Code assistance)
 - **Target Market**: Indonesian mobile users
 - **Tech Rating**: 9.2/10 (Vite configuration)
 - **Status**: ✅ Production Ready
-- **Documentation Files**: 10 focused & relevant docs
+- **Documentation Files**: 10 focused & organized docs
 
 ---
 
 ## 🔗 **External Resources**
 
-- **Live App**: [duittrack.farahtegar.com](https://duittrack.farahtegar.com)
 - **Svelte Docs**: [svelte.dev](https://svelte.dev)
 - **SvelteKit Docs**: [kit.svelte.dev](https://kit.svelte.dev)
 - **Vite Docs**: [vitejs.dev](https://vitejs.dev)
 - **Firebase Docs**: [firebase.google.com/docs](https://firebase.google.com/docs)
 - **TailwindCSS**: [tailwindcss.com](https://tailwindcss.com)
+- **Cloudflare Pages**: [developers.cloudflare.com/pages](https://developers.cloudflare.com/pages)
 
 ---
 
-**Last Updated**: December 30, 2025
-**Documentation Version**: 2.1 (Enhanced with Developer Guides)
+**Last Updated**: November 1, 2025
+**Documentation Version**: 3.2 (Category Tile Selector UX Update)
 **Status**: ✅ Complete & Maintained
 
 ---
