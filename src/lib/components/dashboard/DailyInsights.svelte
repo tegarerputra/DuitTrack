@@ -52,7 +52,7 @@
         <div class="insight-item">
           <span class="insight-icon">📊</span>
           <div class="insight-info">
-            <span class="insight-label">Rata-rata pengeluaran:</span>
+            <span class="insight-label">Rata-rata:</span>
             <span class="insight-value">{formatCompactRupiah(dailyAvg)}/hari</span>
           </div>
         </div>
